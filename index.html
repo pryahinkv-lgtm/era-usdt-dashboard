@@ -69,8 +69,7 @@
 <script>
 const SYMBOL = "ERAUSDT";
 const REST = "https://api.bybit.com/v5/market";
-
-let priceHistory = []; // {time, close}
+let priceHistory = [];
 let klineData = [];
 
 async function fetchTicker(){
@@ -84,8 +83,11 @@ async function fetchKlines(interval="60", limit=200){
   const j = await res.json();
   return j.result.list.reverse().map(k=>({
     time: new Date(parseInt(k[0])),
-    open: parseFloat(k[1]), high: parseFloat(k[2]),
-    low: parseFloat(k[3]), close: parseFloat(k[4]), volume: parseFloat(k[5])
+    open: parseFloat(k[1]),
+    high: parseFloat(k[2]),
+    low: parseFloat(k[3]),
+    close: parseFloat(k[4]),
+    volume: parseFloat(k[5])
   }));
 }
 
@@ -152,4 +154,41 @@ function renderFiboTable(levels, currentPrice){
   }
 }
 
-function classify(rsiLast, macdLast, signalLast,)
+function classify(rsiLast, macdLast, signalLast){
+  let score = 0;
+  let reasons = [];
+
+  if(rsiLast < 30){ score++; reasons.push("RSI в зоне перепроданности (<30)"); }
+  else if(rsiLast > 70){ score--; reasons.push("RSI в зоне перекупленности (>70)"); }
+  else { reasons.push("RSI в нейтральной зоне"); }
+
+  if(macdLast > signalLast){ score++; reasons.push("MACD выше сигнальной линии (бычий импульс)"); }
+  else { score--; reasons.push("MACD ниже сигнальной линии (медвежий импульс)"); }
+
+  let label, cls;
+  if(score >= 2){ label = "LONG"; cls = "sig-long"; }
+  else if(score <= -2){ label = "SHORT"; cls = "sig-short"; }
+  else { label = "НЕЙТРАЛЬНО / ОЖИДАНИЕ"; cls = "sig-neutral"; }
+
+  return {label, cls, reasons};
+}
+
+function renderPriceChart(kl){
+  const x = kl.map(k=>k.time);
+  Plotly.newPlot("priceChart", [{
+    x, open: kl.map(k=>k.open), high: kl.map(k=>k.high),
+    low: kl.map(k=>k.low), close: kl.map(k=>k.close),
+    type: "candlestick",
+    increasing: {line:{color:"#3fb950"}},
+    decreasing: {line:{color:"#f85149"}}
+  }], {
+    paper_bgcolor:"#161b22", plot_bgcolor:"#161b22",
+    font:{color:"#e6e6e6", size:10},
+    margin:{t:20,l:40,r:10,b:30},
+    xaxis:{rangeslider:{visible:false}, gridcolor:"#262d38"},
+    yaxis:{gridcolor:"#262d38"}
+  }, {responsive:true, displayModeBar:false});
+}
+
+function renderRSIChart(kl, rsis){
+  Plotly.newPlot
