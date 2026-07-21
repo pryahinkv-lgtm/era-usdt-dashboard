@@ -69,9 +69,11 @@
 <script>
 const SYMBOL = "ERAUSDT";
 const REST = "https://api.bybit.com/v5/market";
+const WS_PUBLIC_LINEAR = "wss://stream.bybit.com/v5/public/linear"; // публичный WS для linear[web:27]
 let klineData = [];
+let priceChartInitialized = false;
 
-// ---- API ----
+// ---- REST API ----
 
 async function fetchTicker(){
   const res = await fetch(`${REST}/tickers?category=linear&symbol=${SYMBOL}`);
@@ -212,6 +214,20 @@ function renderPriceChart(kl){
     xaxis:{rangeslider:{visible:false}, gridcolor:"#262d38"},
     yaxis:{gridcolor:"#262d38}
   }, {responsive:true, displayModeBar:false});
+
+  priceChartInitialized = true;
+}
+
+function updateLastCandleOnChart(last){
+  if(!priceChartInitialized) return;
+
+  Plotly.restyle("priceChart", {
+    open: [[...klineData.map(k=>k.open)]],
+    high: [[...klineData.map(k=>k.high)]],
+    low:  [[...klineData.map(k=>k.low)]],
+    close:[[...klineData.map(k=>k.close)]],
+    x:    [[...klineData.map(k=>k.time)]]
+  }, [0]); // обновляем первый trace[web:3][web:13]
 }
 
 function renderRSIChart(kl, rsis){
@@ -278,11 +294,11 @@ function renderMACDChart(kl, macdObj){
   }, {responsive:true, displayModeBar:false});
 }
 
-// ---- Обновление дашборда ----
+// ---- REST обновление дашборда ----
 
-async function updateDashboard(){
+async function updateDashboardREST(){
   try{
-    document.getElementById("status").textContent = "Загрузка данных Bybit...";
+    document.getElementById("status").textContent = "Загрузка данных Bybit (REST)...";
 
     const [ticker, kl] = await Promise.all([
       fetchTicker(),
@@ -326,15 +342,107 @@ async function updateDashboard(){
     renderRSIChart(kl, rsis);
     renderMACDChart(kl, macdObj);
 
-    document.getElementById("status").textContent = "Обновлено: " + new Date().toLocaleString();
+    document.getElementById("status").textContent = "Обновлено (REST): " + new Date().toLocaleString();
   } catch(e){
     console.error(e);
-    document.getElementById("status").textContent = "Ошибка загрузки данных: " + e.message;
+    document.getElementById("status").textContent = "Ошибка REST: " + e.message;
   }
 }
 
-updateDashboard();
-setInterval(updateDashboard, 60_000);
+// ---- WebSocket: лайв тикер + kline ----
+
+function initWebSocket(){
+  try{
+    const ws = new WebSocket(WS_PUBLIC_LINEAR); // wss://stream.bybit.com/v5/public/linear[web:27]
+
+    ws.onopen = () => {
+      console.log("WS connected");
+
+      // подписка на тикер
+      const subTicker = {
+        op: "subscribe",
+        args: [`tickers.${SYMBOL}`] // тикер для linear[web:21]
+      };
+
+      // подписка на kline H1
+      const subKline = {
+        op: "subscribe",
+        args: [`kline.60.${SYMBOL}`] // интервал 60 минут[web:8]
+      };
+
+      ws.send(JSON.stringify(subTicker));
+      ws.send(JSON.stringify(subKline));
+
+      document.getElementById("status").textContent =
+        "WebSocket подключён, идёт стрим тикера и kline...";
+    };
+
+    ws.onmessage = (ev) => {
+      try{
+        const data = JSON.parse(ev.data);
+
+        // тикер обновление
+        if (data.topic && data.topic.startsWith("tickers.")) {
+          const t = data.data[0] || data.data; // структура зависит от snapshot/delta[web:21]
+          const lastPrice = parseFloat(t.lastPrice);
+          const chg24 = parseFloat(t.price24hPcnt);
+          const funding = parseFloat(t.fundingRate);
+          const oi = parseFloat(t.openInterest);
+
+          document.getElementById("price").textContent   = lastPrice.toFixed(6);
+          document.getElementById("chg24").textContent   = (chg24*100).toFixed(2) + "%";
+          document.getElementById("funding").textContent = (funding*100).toFixed(4) + "%";
+          document.getElementById("oi").textContent      = oi.toFixed(0);
+        }
+
+        // kline обновление
+        if (data.topic && data.topic.startsWith("kline.")) {
+          const k = data.data[0]; // один объект kline[web:8]
+          const candle = {
+            time: new Date(parseInt(k.startTime)),
+            open: parseFloat(k.open),
+            high: parseFloat(k.high),
+            low: parseFloat(k.low),
+            close: parseFloat(k.close),
+            volume: parseFloat(k.volume)
+          };
+
+          // если confirm = true — закрытая свеча, добавляем
+          if (k.confirm) {
+            klineData.push(candle);
+            if (klineData.length > 200) klineData.shift();
+          } else {
+            // обновление текущей последней свечи
+            klineData[klineData.length-1] = candle;
+          }
+
+          updateLastCandleOnChart(candle);
+        }
+      } catch(e){
+        console.error("WS message error", e);
+      }
+    };
+
+    ws.onerror = (err) => {
+      console.error("WS error", err);
+      document.getElementById("status").textContent = "Ошибка WebSocket, см. консоль.";
+    };
+
+    ws.onclose = () => {
+      console.log("WS closed, trying to reconnect in 10s...");
+      document.getElementById("status").textContent = "WebSocket отключён, реконнект через 10 секунд.";
+      setTimeout(initWebSocket, 10000);
+    };
+  } catch(e){
+    console.error("WS init error", e);
+  }
+}
+
+// ---- Старт ----
+
+updateDashboardREST();
+setInterval(updateDashboardREST, 300_000); // REST раз в 5 минут для синхронизации[web:4][web:18]
+initWebSocket();
 </script>
 
 </body>
