@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>ERA/USDT Futures Dashboard</title>
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<style>
+  body{background:#0e1117;color:#e6e6e6;font-family:Segoe UI,Arial,sans-serif;margin:0;padding:16px;}
+  h1{font-size:20px;margin-bottom:4px;}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+  .card{background:#161b22;border:1px solid #262d38;border-radius:8px;padding:10px 14px;}
+  .card .label{font-size:11px;color:#8b949e;text-transform:uppercase;}
+  .card .value{font-size:18px;font-weight:600;margin-top:4px;}
+  .green{color:#3fb950;} .red{color:#f85149;} .yellow{color:#d29922;}
+  .signal-box{padding:14px;border-radius:8px;font-size:16px;font-weight:700;text-align:center;margin-bottom:14px;}
+  .sig-long{background:#0f3d24;color:#3fb950;border:1px solid #3fb950;}
+  .sig-short{background:#3d0f14;color:#f85149;border:1px solid #f85149;}
+  .sig-neutral{background:#26241a;color:#d29922;border:1px solid #d29922;}
+  .charts{display:grid;grid-template-columns:2fr 1fr;gap:10px;}
+  .chart-box{background:#161b22;border-radius:8px;padding:6px;}
+  .analysis{background:#161b22;border-radius:8px;padding:14px;margin-top:14px;font-size:13px;line-height:1.6;}
+  .analysis h3{margin-top:0;color:#58a6ff;}
+  table{width:100%;font-size:12px;border-collapse:collapse;}
+  td,th{padding:4px 6px;border-bottom:1px solid #262d38;}
+  #status{font-size:12px;color:#8b949e;}
+</style>
+</head>
+<body>
+
+<h1>ERA/USDT — Мониторинг фьючерса (Bybit Linear)</h1>
+<div id="status">Загрузка...</div>
+
+<div class="grid">
+  <div class="card"><div class="label">Цена</div><div class="value" id="price">-</div></div>
+  <div class="card"><div class="label">24ч изменение</div><div class="value" id="chg24">-</div></div>
+  <div class="card"><div class="label">Funding Rate</div><div class="value" id="funding">-</div></div>
+  <div class="card"><div class="label">Open Interest</div><div class="value" id="oi">-</div></div>
+</div>
+
+<div class="signal-box sig-neutral" id="signalBox">Расчёт сигнала...</div>
+
+<div class="charts">
+  <div class="chart-box" id="priceChart" style="height:420px;"></div>
+  <div class="chart-box" id="fiboTable">
+    <b>Уровни Фибоначчи (H1, последний свинг)</b>
+    <table id="fiboTbl"><tbody></tbody></table>
+  </div>
+</div>
+
+<div class="charts" style="margin-top:10px;">
+  <div class="chart-box" id="rsiChart" style="height:220px;"></div>
+  <div class="chart-box" id="macdChart" style="height:220px;"></div>
+</div>
+
+<div class="analysis">
+  <h3>Технический анализ (авто)</h3>
+  <div id="techText">Расчёт...</div>
+</div>
+
+<div class="analysis">
+  <h3>Фундаментальный анализ — Caldera (ERA)</h3>
+  <p><b>Проект:</b> Caldera — модульная rollup‑платформа для Ethereum ("Internet of Rollups"), обеспечивающая горизонтальное масштабирование и взаимосвязь между роллапами через протокол Metalayer.</p>
+  <p><b>Токеномика:</b> общий supply — 1,000,000,000 ERA, старт circulating supply — 148,500,000 (14.85%). Крупнейшая доля выделена ранним инвесторам и фонду (Sequoia, Dragonfly, Founders Fund входят в число бэкеров), поэтому на горизонте 12–36 месяцев действует существенный график анлоков команды и инвесторов.</p>
+  <p><b>Утилита токена:</b> оплата межсетевых газовых транзакций, управление протоколом (governance), стейкинг для сети и субсетей.</p>
+  <p><b>Риски:</b> регулярные разлоки токенов у Foundation, R&D и Community Treasury создают постоянное давление предложения; ликвидность и капитализация (~десятки млн $) делают пару волатильной на новостном фоне.</p>
+  <p style="color:#8b949e;font-size:11px;">Данные по токеномике собраны из открытых источников (CoinGecko, Binance Research, документация Caldera) на дату формирования дашборда. Не является инвестиционной рекомендацией.</p>
+</div>
+
+<script>
+const SYMBOL = "ERAUSDT";
+const REST = "https://api.bybit.com/v5/market";
+
+let priceHistory = []; // {time, close}
+let klineData = [];
+
+async function fetchTicker(){
+  const res = await fetch(`${REST}/tickers?category=linear&symbol=${SYMBOL}`);
+  const j = await res.json();
+  return j.result.list[0];
+}
+
+async function fetchKlines(interval="60", limit=200){
+  const res = await fetch(`${REST}/kline?category=linear&symbol=${SYMBOL}&interval=${interval}&limit=${limit}`);
+  const j = await res.json();
+  return j.result.list.reverse().map(k=>({
+    time: new Date(parseInt(k[0])),
+    open: parseFloat(k[1]), high: parseFloat(k[2]),
+    low: parseFloat(k[3]), close: parseFloat(k[4]), volume: parseFloat(k[5])
+  }));
+}
+
+function calcRSI(closes, period=14){
+  let rsis = [];
+  let gains=0, losses=0;
+  for(let i=1;i<=period;i++){
+    let diff = closes[i]-closes[i-1];
+    if(diff>=0) gains+=diff; else losses-=diff;
+  }
+  let avgGain=gains/period, avgLoss=losses/period;
+  rsis[period] = 100 - (100/(1+ (avgGain/(avgLoss||1e-9))));
+  for(let i=period+1;iloses.length;i++){
+    let diff = closes[i]-closes[i-1];
+    let gain = diff>0?diff:0, loss = diff<0?-diff:0;
+    avgGain = (avgGain*(period-1)+gain)/period;
+    avgLoss = (avgLoss*(period-1)+loss)/period;
+    rsis[i] = 100 - (100/(1+ (avgGain/(avgLoss||1e-9))));
+  }
+  return rsis;
+}
+
+function ema(values, period){
+  let k = 2/(period+1);
+  let emaArr = [];
+  emaArr[0] = values[0];
+  for(let i=1;i<values.length;i++){
+    emaArr[i] = values[i]*k + emaArr[i-1]*(1-k);
+  }
+  return emaArr;
+}
+
+function calcMACD(closes){
+  const ema12 = ema(closes,12);
+  const ema26 = ema(closes,26);
+  const macd = closes.map((_,i)=> ema12[i]-ema26[i]);
+  const signal = ema(macd,9);
+  const hist = macd.map((v,i)=> v - signal[i]);
+  return {macd, signal, hist};
+}
+
+function calcFibo(highs, lows){
+  const swingHigh = Math.max(...highs.slice(-60));
+  const swingLow = Math.min(...lows.slice(-60));
+  const diff = swingHigh - swingLow;
+  const levels = {
+    "0.0 (High)": swingHigh,
+    "0.236": swingHigh - diff*0.236,
+    "0.382": swingHigh - diff*0.382,
+    "0.5": swingHigh - diff*0.5,
+    "0.618": swingHigh - diff*0.618,
+    "0.786": swingHigh - diff*0.786,
+    "1.0 (Low)": swingLow
+  };
+  return levels;
+}
+
+function renderFiboTable(levels, currentPrice){
+  const tbody = document.querySelector("#fiboTbl tbody");
+  tbody.innerHTML = "<tr><th>Уровень</th><th>Цена</th></tr>";
+  for(const [k,v] of Object.entries(levels)){
+    const near = Math.abs(v-currentPrice)/currentPrice < 0.01;
+    tbody.innerHTML += `<tr style="${near?'color:#d29922;font-weight:700':''}"><td>${k}</td><td>${v.toFixed(6)}</td></tr>`;
+  }
+}
+
+function classify(rsiLast, macdLast, signalLast,      
