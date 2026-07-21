@@ -1,29 +1,29 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>ERA/USDT Futures Dashboard</title>
-<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
-<style>
-  body{background:#0e1117;color:#e6e6e6;font-family:Segoe UI,Arial,sans-serif;margin:0;padding:16px;}
-  h1{font-size:20px;margin-bottom:4px;}
-  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
-  .card{background:#161b22;border:1px solid #262d38;border-radius:8px;padding:10px 14px;}
-  .card .label{font-size:11px;color:#8b949e;text-transform:uppercase;}
-  .card .value{font-size:18px;font-weight:600;margin-top:4px;}
-  .green{color:#3fb950;} .red{color:#f85149;} .yellow{color:#d29922;}
-  .signal-box{padding:14px;border-radius:8px;font-size:16px;font-weight:700;text-align:center;margin-bottom:14px;}
-  .sig-long{background:#0f3d24;color:#3fb950;border:1px solid #3fb950;}
-  .sig-short{background:#3d0f14;color:#f85149;border:1px solid #f85149;}
-  .sig-neutral{background:#26241a;color:#d29922;border:1px solid #d29922;}
-  .charts{display:grid;grid-template-columns:2fr 1fr;gap:10px;}
-  .chart-box{background:#161b22;border-radius:8px;padding:6px;}
-  .analysis{background:#161b22;border-radius:8px;padding:14px;margin-top:14px;font-size:13px;line-height:1.6;}
-  .analysis h3{margin-top:0;color:#58a6ff;}
-  table{width:100%;font-size:12px;border-collapse:collapse;}
-  td,th{padding:4px 6px;border-bottom:1px solid #262d38;}
-  #status{font-size:12px;color:#8b949e;}
-</style>
+  <meta charset="UTF-8">
+  <title>ERA/USDT Futures Dashboard</title>
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <style>
+    body{background:#0e1117;color:#e6e6e6;font-family:Segoe UI,Arial,sans-serif;margin:0;padding:16px;}
+    h1{font-size:20px;margin-bottom:4px;}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+    .card{background:#161b22;border:1px solid #262d38;border-radius:8px;padding:10px 14px;}
+    .card .label{font-size:11px;color:#8b949e;text-transform:uppercase;}
+    .card .value{font-size:18px;font-weight:600;margin-top:4px;}
+    .green{color:#3fb950;} .red{color:#f85149;} .yellow{color:#d29922;}
+    .signal-box{padding:14px;border-radius:8px;font-size:16px;font-weight:700;text-align:center;margin-bottom:14px;}
+    .sig-long{background:#0f3d24;color:#3fb950;border:1px solid #3fb950;}
+    .sig-short{background:#3d0f14;color:#f85149;border:1px solid #f85149;}
+    .sig-neutral{background:#26241a;color:#d29922;border:1px solid #d29922;}
+    .charts{display:grid;grid-template-columns:2fr 1fr;gap:10px;}
+    .chart-box{background:#161b22;border-radius:8px;padding:6px;}
+    .analysis{background:#161b22;border-radius:8px;padding:14px;margin-top:14px;font-size:13px;line-height:1.6;}
+    .analysis h3{margin-top:0;color:#58a6ff;}
+    table{width:100%;font-size:12px;border-collapse:collapse;}
+    td,th{padding:4px 6px;border-bottom:1px solid #262d38;}
+    #status{font-size:12px;color:#8b949e;}
+  </style>
 </head>
 <body>
 
@@ -69,8 +69,9 @@
 <script>
 const SYMBOL = "ERAUSDT";
 const REST = "https://api.bybit.com/v5/market";
-let priceHistory = [];
 let klineData = [];
+
+// ---- API ----
 
 async function fetchTicker(){
   const res = await fetch(`${REST}/tickers?category=linear&symbol=${SYMBOL}`);
@@ -91,26 +92,41 @@ async function fetchKlines(interval="60", limit=200){
   }));
 }
 
+// ---- Индикаторы ----
+
 function calcRSI(closes, period=14){
+  if (closes.length <= period) return [];
+
   let rsis = [];
-  let gains=0, losses=0;
+  let gains = 0, losses = 0;
+
   for(let i=1;i<=period;i++){
-    let diff = closes[i]-closes[i-1];
-    if(diff>=0) gains+=diff; else losses-=diff;
+    let diff = closes[i] - closes[i-1];
+    if(diff >= 0) gains += diff;
+    else losses -= diff;
   }
-  let avgGain=gains/period, avgLoss=losses/period;
-  rsis[period] = 100 - (100/(1+ (avgGain/(avgLoss||1e-9))));
-  for(let i=period+1;iloses.length;i++){
-    let diff = closes[i]-closes[i-1];
-    let gain = diff>0?diff:0, loss = diff<0?-diff:0;
-    avgGain = (avgGain*(period-1)+gain)/period;
-    avgLoss = (avgLoss*(period-1)+loss)/period;
-    rsis[i] = 100 - (100/(1+ (avgGain/(avgLoss||1e-9))));
+
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+
+  rsis[period] = 100 - (100 / (1 + (avgGain / (avgLoss || 1e-9))));
+
+  for(let i = period + 1; i < closes.length; i++){
+    let diff = closes[i] - closes[i-1];
+    let gain = diff > 0 ? diff : 0;
+    let loss = diff < 0 ? -diff : 0;
+
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+
+    rsis[i] = 100 - (100 / (1 + (avgGain / (avgLoss || 1e-9))));
   }
+
   return rsis;
 }
 
 function ema(values, period){
+  if (!values.length) return [];
   let k = 2/(period+1);
   let emaArr = [];
   emaArr[0] = values[0];
@@ -123,13 +139,14 @@ function ema(values, period){
 function calcMACD(closes){
   const ema12 = ema(closes,12);
   const ema26 = ema(closes,26);
-  const macd = closes.map((_,i)=> ema12[i]-ema26[i]);
+  const macd = closes.map((_,i)=> (ema12[i] ?? ema12[ema12.length-1]) - (ema26[i] ?? ema26[ema26.length-1]));
   const signal = ema(macd,9);
-  const hist = macd.map((v,i)=> v - signal[i]);
+  const hist = macd.map((v,i)=> v - (signal[i] ?? signal[signal.length-1]));
   return {macd, signal, hist};
 }
 
 function calcFibo(highs, lows){
+  if (highs.length < 60 || lows.length < 60) return {};
   const swingHigh = Math.max(...highs.slice(-60));
   const swingLow = Math.min(...lows.slice(-60));
   const diff = swingHigh - swingLow;
@@ -154,6 +171,8 @@ function renderFiboTable(levels, currentPrice){
   }
 }
 
+// ---- Классификация сигнала ----
+
 function classify(rsiLast, macdLast, signalLast){
   let score = 0;
   let reasons = [];
@@ -173,11 +192,16 @@ function classify(rsiLast, macdLast, signalLast){
   return {label, cls, reasons};
 }
 
+// ---- Графики ----
+
 function renderPriceChart(kl){
   const x = kl.map(k=>k.time);
   Plotly.newPlot("priceChart", [{
-    x, open: kl.map(k=>k.open), high: kl.map(k=>k.high),
-    low: kl.map(k=>k.low), close: kl.map(k=>k.close),
+    x,
+    open: kl.map(k=>k.open),
+    high: kl.map(k=>k.high),
+    low: kl.map(k=>k.low),
+    close: kl.map(k=>k.close),
     type: "candlestick",
     increasing: {line:{color:"#3fb950"}},
     decreasing: {line:{color:"#f85149"}}
@@ -186,9 +210,132 @@ function renderPriceChart(kl){
     font:{color:"#e6e6e6", size:10},
     margin:{t:20,l:40,r:10,b:30},
     xaxis:{rangeslider:{visible:false}, gridcolor:"#262d38"},
-    yaxis:{gridcolor:"#262d38"}
+    yaxis:{gridcolor:"#262d38}
   }, {responsive:true, displayModeBar:false});
 }
 
 function renderRSIChart(kl, rsis){
-  Plotly.newPlot
+  const x = kl.map(k => k.time);
+  const rsiVals = rsis;
+
+  Plotly.newPlot("rsiChart", [{
+    x,
+    y: rsiVals,
+    type: "scatter",
+    mode: "lines",
+    line: {color: "#58a6ff", width: 1}
+  }, {
+    x,
+    y: Array(rsiVals.length).fill(70),
+    type: "scatter",
+    mode: "lines",
+    line: {color: "#f85149", width: 1, dash: "dot"},
+    showlegend: false
+  }, {
+    x,
+    y: Array(rsiVals.length).fill(30),
+    type: "scatter",
+    mode: "lines",
+    line: {color: "#3fb950", width: 1, dash: "dot"},
+    showlegend: false
+  }], {
+    paper_bgcolor:"#161b22", plot_bgcolor:"#161b22",
+    font:{color:"#e6e6e6", size:10},
+    margin:{t:20,l:40,r:10,b:30},
+    xaxis:{gridcolor:"#262d38"},
+    yaxis:{gridcolor:"#262d38, range:[0,100]}
+  }, {responsive:true, displayModeBar:false});
+}
+
+function renderMACDChart(kl, macdObj){
+  const x = kl.map(k => k.time);
+  Plotly.newPlot("macdChart", [{
+    x,
+    y: macdObj.macd,
+    type: "scatter",
+    mode: "lines",
+    name: "MACD",
+    line: {color:"#58a6ff", width:1}
+  }, {
+    x,
+    y: macdObj.signal,
+    type: "scatter",
+    mode: "lines",
+    name: "Signal",
+    line: {color:"#d29922", width:1}
+  }, {
+    x,
+    y: macdObj.hist,
+    type: "bar",
+    name: "Hist",
+    marker:{color:"#3fb950"}
+  }], {
+    paper_bgcolor:"#161b22", plot_bgcolor:"#161b22",
+    font:{color:"#e6e6e6", size:10},
+    margin:{t:20,l:40,r:10,b:30},
+    xaxis:{gridcolor:"#262d38"},
+    yaxis:{gridcolor:"#262d38}
+  }, {responsive:true, displayModeBar:false});
+}
+
+// ---- Обновление дашборда ----
+
+async function updateDashboard(){
+  try{
+    document.getElementById("status").textContent = "Загрузка данных Bybit...";
+
+    const [ticker, kl] = await Promise.all([
+      fetchTicker(),
+      fetchKlines("60", 200)
+    ]);
+
+    klineData = kl;
+    const closes = kl.map(k=>k.close);
+    const highs = kl.map(k=>k.high);
+    const lows  = kl.map(k=>k.low);
+
+    const lastPrice = parseFloat(ticker.lastPrice);
+    const chg24 = parseFloat(ticker.price24hPcnt);
+    const funding = parseFloat(ticker.fundingRate);
+    const oi = parseFloat(ticker.openInterest);
+
+    document.getElementById("price").textContent   = lastPrice.toFixed(6);
+    document.getElementById("chg24").textContent   = (chg24*100).toFixed(2) + "%";
+    document.getElementById("funding").textContent = (funding*100).toFixed(4) + "%";
+    document.getElementById("oi").textContent      = oi.toFixed(0);
+
+    const rsis = calcRSI(closes, 14);
+    const macdObj = calcMACD(closes);
+    const fiboLevels = calcFibo(highs, lows);
+
+    const rsiLast = rsis[rsis.length-1];
+    const macdLast = macdObj.macd[macdObj.macd.length-1];
+    const signalLast = macdObj.signal[macdObj.signal.length-1];
+
+    const sig = classify(rsiLast, macdLast, signalLast);
+    const box = document.getElementById("signalBox");
+    box.textContent = `Сигнал: ${sig.label}`;
+    box.className = "signal-box " + sig.cls;
+
+    document.getElementById("techText").textContent =
+      `RSI: ${rsiLast.toFixed(2)}; MACD: ${macdLast.toFixed(6)}, Signal: ${signalLast.toFixed(6)}. ` +
+      `Причины: ${sig.reasons.join("; ")}.`;
+
+    renderFiboTable(fiboLevels, lastPrice);
+    renderPriceChart(kl);
+    renderRSIChart(kl, rsis);
+    renderMACDChart(kl, macdObj);
+
+    document.getElementById("status").textContent = "Обновлено: " + new Date().toLocaleString();
+  } catch(e){
+    console.error(e);
+    document.getElementById("status").textContent = "Ошибка загрузки данных: " + e.message;
+  }
+}
+
+updateDashboard();
+setInterval(updateDashboard, 60_000);
+</script>
+
+</body>
+</html>
