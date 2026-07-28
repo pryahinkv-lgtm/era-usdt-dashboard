@@ -1,781 +1,756 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>ERAUSDT Futures Dashboard (Bybit + Nison)</title>
-  <script src="https://cdn.plot.ly/plotly-3.1.0.min.js"></script> <!-- Plotly [web:54] -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ERA/USDT Futures Dashboard</title>
+  <title>ERAUSDT Futures Dashboard</title>
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
   <style>
-    body {
-      background: #0e1117;
-      color: #e6e6e6;
-      font-family: Segoe UI, Arial, sans-serif;
-      margin: 0;
-      padding: 0;
+    :root{
+      --bg:#0e1117;
+      --panel:#161b22;
+      --panel-2:#11161d;
+      --border:#262d38;
+      --text:#e6edf3;
+      --muted:#8b949e;
+@@ -155,50 +154,44 @@
+      color:#c9d1d9;
+      border:1px solid #30363d;
     }
-    header {
-      padding: 10px 20px;
-      background: #111827;
-      border-bottom: 1px solid #1f2937;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    .green{color:var(--green)}
+    .red{color:var(--red)}
+    .yellow{color:var(--yellow)}
+    .muted{color:var(--muted)}
+    .reasons{
+      margin:8px 0 0;
+      padding-left:18px;
     }
-    header h1 {
-      font-size: 18px;
-      margin: 0;
+    .reasons li{
+      margin-bottom:4px;
     }
-    .tf-buttons button {
-      margin-right: 6px;
-      padding: 4px 10px;
-      background: #1f2937;
-      border: 1px solid #374151;
-      color: #e5e7eb;
-      cursor: pointer;
-      border-radius: 4px;
-      font-size: 12px;
+    @media (max-width: 1180px){
+    .reasons li{margin-bottom:4px}
+    @media (max-width:1180px){
+      .grid{grid-template-columns:repeat(3,1fr)}
+      .charts{grid-template-columns:1fr}
     }
-    .tf-buttons button.active {
-      background: #2563eb;
-      border-color: #3b82f6;
+    @media (max-width: 760px){
+    @media (max-width:760px){
+      .grid{grid-template-columns:repeat(2,1fr)}
+      .subgrid{grid-template-columns:1fr}
     }
-    .layout {
-      display: grid;
-      grid-template-columns: 3fr 1.5fr;
-      grid-template-rows: auto auto;
-      gap: 10px;
-      padding: 10px;
-    }
-    .card {
-      background: #111827;
-      border: 1px solid #1f2937;
-      border-radius: 6px;
-      padding: 8px;
-    }
-    .card h2 {
-      font-size: 14px;
-      margin: 0 0 6px 0;
-    }
-    #price-chart, #rsi-chart, #macd-chart, #fibo-chart {
-      width: 100%;
-      height: 260px;
-    }
-    #signals {
-      font-size: 13px;
-    }
-    .signal-box {
-      padding: 6px 8px;
-      border-radius: 4px;
-      margin-bottom: 6px;
-    }
-    .signal-long { background: #14532d; color: #bbf7d0; }
-    .signal-short { background: #7f1d1d; color: #fecaca; }
-    .signal-neutral { background: #374151; color: #e5e7eb; }
-    ul {
-      margin: 4px 0 0 16px;
-      padding: 0;
-    }
-    li {
-      margin-bottom: 3px;
-    }
-    .small {
-      font-size: 11px;
-      color: #9ca3af;
+    @media (max-width: 520px){
+    @media (max-width:520px){
+      .grid{grid-template-columns:1fr}
     }
   </style>
 </head>
 <body>
-<header>
-  <div>
-    <h1>ERAUSDT Futures Dashboard (Bybit + Nison)</h1>
-    <div class="small">Bybit REST v5 kline, Plotly, Japanese Candlesticks</div>
-  </div>
-  <div class="tf-buttons">
-    <button data-tf="5"  class="active">5m</button>
-    <button data-tf="15">15m</button>
-    <button data-tf="60">1h</button>
-    <button data-tf="240">4h</button>
-  </div>
-</header>
+  <h1>ERA/USDT — Bybit Futures Dashboard</h1>
+  <h1>ERAUSDT — Binance Futures Dashboard</h1>
+  <div id="status">Загрузка...</div>
 
-<div class="layout">
-  <div class="card">
-    <h2>ERAUSDT Price + Candles</h2>
-    <div id="price-chart"></div>
-    <div class="small" id="tf-signal-box" style="margin-top:6px;"></div>
-    <ul id="tf-signal-reasons"></ul>
-  </div>
-
-  <div class="card" id="signals">
-    <h2>Signals (H1 + Nison)</h2>
-    <div id="era-h1-signal-box" class="signal-box signal-neutral">H1: NEUTRAL</div>
-    <ul id="era-h1-reasons"></ul>
-    <hr>
-    <div class="small">
-      Свечные паттерны Нисона: Hammer, Shooting Star, Engulfing, Morning/Evening Star.<br>
-      Используются как подтверждение тренда RSI+MACD, уровней и объёма, плюс Fibo‑уровни как зоны реакции цены [web:53][web:49][web:56][web:83].
+  <div class="toolbar">
+    <div class="tf-group">
+      <button class="tf-btn" data-tf="5">5m</button>
+      <button class="tf-btn" data-tf="15">15m</button>
+      <button class="tf-btn active" data-tf="60">1h</button>
+      <button class="tf-btn" data-tf="240">4h</button>
+      <button class="tf-btn" data-tf="5m">5m</button>
+      <button class="tf-btn" data-tf="15m">15m</button>
+      <button class="tf-btn active" data-tf="1h">1h</button>
+      <button class="tf-btn" data-tf="4h">4h</button>
     </div>
+    <div class="meta" id="activeTfLabel">Таймфрейм: 1h</div>
   </div>
 
-  <div class="card">
-    <h2>RSI / MACD (H1)</h2>
-    <div id="rsi-chart"></div>
-    <div id="macd-chart"></div>
+  <div class="grid">
+    <div class="card"><div class="label">Цена</div><div class="value" id="price">-</div></div>
+    <div class="card"><div class="label">24ч изменение</div><div class="value" id="chg24">-</div></div>
+    <div class="card"><div class="label">Funding Rate</div><div class="value" id="funding">-</div></div>
+    <div class="card"><div class="label">Open Interest</div><div class="value" id="oi">-</div></div>
+    <div class="card"><div class="label">Mark Price</div><div class="value" id="mark">-</div></div>
+    <div class="card"><div class="label">Объём последней свечи</div><div class="value" id="lastVol">-</div></div>
+    <div class="card"><div class="label">High / Low (24h)</div><div class="value" id="hiLo">-</div></div>
   </div>
-  <div class="card">
-    <h2>Fibonacci Levels (H1)</h2>
-    <div id="fibo-chart"></div>
+
+  <div class="signal-box sig-neutral" id="signalBox">Расчёт сигнала...</div>
+@@ -251,38 +244,49 @@
   </div>
-</div>
 
-<script>
-// =============== CONFIG ===============
-const SYMBOL = "ERAUSDT";
-const CATEGORY = "linear"; // USDT perpetual [web:32]
-let currentInterval = 5;   // minutes: 5, 15, 60, 240
+  <div class="analysis">
+    <h3>Фундаментальный контекст ERA</h3>
+    <h3>Контекст ERAUSDT</h3>
+    <p>
+      Caldera развивает modular rollup-инфраструктуру для Ethereum, а токен ERA используется в экосистемных сценариях вроде gas, governance и staking, поэтому для фьючерсного дашборда имеет смысл сочетать price action с funding/open interest, а не опираться только на один индикатор [web:3].
+      ERAUSDT — USDⓈ‑маржированный перпетуальный контракт на Binance Futures. В этом дашборде используются REST‑эндпоинты <code>/fapi/v1/klines</code> и <code>/fapi/v1/ticker/24hr</code>, а также WebSocket‑потоки кандлстиков и тикера через <code>wss://fstream.binance.com/stream</code>, согласно официальной документации USDS‑M фьючерсов [web:108][web:95][web:116][web:82].
+    </p>
+    <p>
+      Этот интерфейс строится на публичных market-данных Bybit, где доступны historical klines через `/v5/market/kline`, а live-свечи идут через `kline.{interval}.{symbol}` [web:28][web:2].
+      RSI(14) и MACD(12,26,9) на H1 комбинируются для фильтрации направленного риска: MACD задаёт направление тренда и импульс, а RSI даёт информацию о силе движения и возможной перекупленности/перепроданности, как рекомендуют современные стратегии RSI+MACD [web:70][web:83][web:84][web:92].
+    </p>
+  </div>
 
-document.querySelectorAll(".tf-buttons button").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tf-buttons button").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    currentInterval = parseInt(btn.getAttribute("data-tf"), 10);
-    fetchAndRender();
-  });
-});
+  <script>
+    const SYMBOL = "ERAUSDT";
+    const REST = "https://api.bybit.com/v5/market";
+    const WS_PUBLIC_LINEAR = "wss://stream.bybit.com/v5/public/linear";
+    const TF_LABELS = { "5":"5m", "15":"15m", "60":"1h", "240":"4h" };
 
-// =============== BYBIT REST v5 KLINE FETCH ===============
-async function fetchKlines(intervalMinutes, limit = 200) {
-  // Bybit v5: GET /v5/market/kline?category=linear&symbol=ERAUSDT&interval=60&limit=200 [web:12][web:32]
-  const interval = intervalMinutes.toString();
-  const url = `https://api.bybit.com/v5/market/kline?category=${CATEGORY}&symbol=${SYMBOL}&interval=${interval}&limit=${limit}`;
-  const resp = await fetch(url);
-  const data = await resp.json();
-  if (!data.result || !data.result.list) {
-    console.error("Bad kline data", data);
-    return [];
-  }
-  // list: [ startTime, open, high, low, close, volume, turnover ]
-  return data.result.list.map(row => {
-    return {
-      time: Number(row[0]),
-      open: Number(row[1]),
-      high: Number(row[2]),
-      low: Number(row[3]),
-      close: Number(row[4]),
-      volume: Number(row[5])
+    let currentInterval = "60";
+    const REST_BASE = "https://fapi.binance.com";
+    const WS_BASE  = "wss://fstream.binance.com/stream";
+
+    const TF_LABELS = {
+      "5m":"5m",
+      "15m":"15m",
+      "1h":"1h",
+      "4h":"4h"
     };
-  }).reverse(); // по возрастанию времени
-}
+    const TF_KLINE = {
+      "5m":"5m",
+      "15m":"15m",
+      "1h":"1h",
+      "4h":"4h"
+    };
 
-// =============== INDICATORS (RSI / EMA / MACD) ===============
-function calcEMA(values, period) {
-  const k = 2 / (period + 1);
-  const ema = [];
-  let prevEMA = values[0];
-  ema.push(prevEMA);
-  for (let i = 1; i < values.length; i++) {
-    const curEMA = values[i] * k + prevEMA * (1 - k);
-    ema.push(curEMA);
-    prevEMA = curEMA;
-  }
-  return ema;
-}
+    let currentInterval = "1h";
+    let klineData = [];
+    let wsInstance = null;
+    let pingTimer = null;
+    let priceChartInitialized = false;
 
-function calcRSI(closes, period = 14) {
-  const rsis = new Array(closes.length).fill(null);
-  let gains = 0;
-  let losses = 0;
-
-  for (let i = 1; i <= period; i++) {
-    const diff = closes[i] - closes[i - 1];
-    if (diff > 0) gains += diff;
-    else losses -= diff;
-  }
-
-  let avgGain = gains / period;
-  let avgLoss = losses / period;
-  rsis[period] = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
-
-  for (let i = period + 1; i < closes.length; i++) {
-    const diff = closes[i] - closes[i - 1];
-    if (diff > 0) {
-      gains = diff;
-      losses = 0;
-    } else {
-      gains = 0;
-      losses = -diff;
+    async function fetchTicker(){
+      const res = await fetch(`${REST}/tickers?category=linear&symbol=${SYMBOL}`);
+      const res = await fetch(`${REST_BASE}/fapi/v1/ticker/24hr?symbol=${SYMBOL}`);
+      const j = await res.json();
+      return j.result.list[0];
+      return j;
     }
-    avgGain = (avgGain * (period - 1) + gains) / period;
-    avgLoss = (avgLoss * (period - 1) + losses) / period;
-    rsis[i] = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
-  }
-  return rsis;
-}
 
-function calcMACD(closes, fast = 12, slow = 26, signal = 9) {
-  const emaFast = calcEMA(closes, fast);
-  const emaSlow = calcEMA(closes, slow);
-  const macd = closes.map((_, i) => emaFast[i] - emaSlow[i]);
-  const signalLine = calcEMA(macd, signal);
-  const hist = macd.map((v, i) => v - signalLine[i]);
-  return { macd, signalLine, hist };
-}
-
-// =============== FIBONACCI LEVELS (H1) ===============
-function computeFiboLevels(klines) {
-  if (klines.length === 0) return [];
-  const highs = klines.map(c => c.high);
-  const lows = klines.map(c => c.low);
-  const maxHigh = Math.max(...highs);
-  const minLow = Math.min(...lows);
-  const diff = maxHigh - minLow;
-  return [
-    { level: 0.0, price: maxHigh },
-    { level: 0.236, price: maxHigh - diff * 0.236 },
-    { level: 0.382, price: maxHigh - diff * 0.382 },
-    { level: 0.5,   price: maxHigh - diff * 0.5 },
-    { level: 0.618, price: maxHigh - diff * 0.618 },
-    { level: 0.786, price: maxHigh - diff * 0.786 },
-    { level: 1.0,   price: minLow }
-  ];
-}
-
-// приблизительное определение “поддержки/сопротивления” из Fibo для контекста сигнала [web:75][web:77][web:83]
-function computeFibSupportResistanceFromRange(fiboLevels) {
-  if (!fiboLevels || fiboLevels.length === 0) return { support: null, resistance: null };
-  const lvl382 = fiboLevels.find(f => Math.abs(f.level - 0.382) < 1e-6);
-  const lvl618 = fiboLevels.find(f => Math.abs(f.level - 0.618) < 1e-6);
-  const lvl50  = fiboLevels.find(f => Math.abs(f.level - 0.5) < 1e-6);
-  // В восходящем тренде откат к 0.382–0.618 — поддержка, 0.5 как нейтральный “pivot” [web:75][web:79][web:83]
-  return {
-    support: lvl618 ? lvl618.price : (lvl382 ? lvl382.price : null),
-    resistance: lvl382 ? lvl382.price : (lvl50 ? lvl50.price : null),
-    pivot: lvl50 ? lvl50.price : null
-  };
-}
-
-// =============== NISON CANDLE HELPERS ===============
-function isBullish(c) { return c.close > c.open; }
-function isBearish(c) { return c.close < c.open; }
-function bodySize(c) { return Math.abs(c.close - c.open); }
-function totalRange(c) { return c.high - c.low; }
-function upperShadow(c) { return c.high - Math.max(c.open, c.close); }
-function lowerShadow(c) { return Math.min(c.open, c.close) - c.low; }
-
-function isHammer(c) {
-  const body = bodySize(c);
-  const range = totalRange(c);
-  if (range === 0) return false;
-  const bodyRatio = body / range;
-  const lower = lowerShadow(c);
-  const upper = upperShadow(c);
-  const lowerToBody = lower / (body || 1);
-  const upperToBody = upper / (body || 1);
-  return (
-    bodyRatio <= 0.3 &&
-    lowerToBody >= 2.0 &&
-    upperToBody <= 0.5
-  );
-}
-
-function isShootingStar(c) {
-  const body = bodySize(c);
-  const range = totalRange(c);
-  if (range === 0) return false;
-  const bodyRatio = body / range;
-  const lower = lowerShadow(c);
-  const upper = upperShadow(c);
-  const upperToBody = upper / (body || 1);
-  const lowerToBody = lower / (body || 1);
-  return (
-    bodyRatio <= 0.3 &&
-    upperToBody >= 2.0 &&
-    lowerToBody <= 0.5
-  );
-}
-
-function isBullishEngulfing(prev, cur) {
-  return (
-    isBearish(prev) &&
-    isBullish(cur) &&
-    cur.close > prev.open &&
-    cur.open < prev.close &&
-    cur.high >= prev.high &&
-    cur.low <= prev.low
-  );
-}
-
-function isBearishEngulfing(prev, cur) {
-  return (
-    isBullish(prev) &&
-    isBearish(cur) &&
-    cur.close < prev.open &&
-    cur.open > prev.close &&
-    cur.high >= prev.high &&
-    cur.low <= prev.low
-  );
-}
-
-function isMorningStar(c1, c2, c3) {
-  const body1 = bodySize(c1);
-  const body2 = bodySize(c2);
-  const body3 = bodySize(c3);
-  return (
-    isBearish(c1) &&
-    isBullish(c3) &&
-    body1 > body2 &&
-    body3 > body2 &&
-    c2.low < c1.close &&
-    c3.close > (c1.open + c1.close) / 2
-  );
-}
-
-function isEveningStar(c1, c2, c3) {
-  const body1 = bodySize(c1);
-  const body2 = bodySize(c2);
-  const body3 = bodySize(c3);
-  return (
-    isBullish(c1) &&
-    isBearish(c3) &&
-    body1 > body2 &&
-    body3 > body2 &&
-    c2.high > c1.close &&
-    c3.close < (c1.open + c1.close) / 2
-  );
-}
-
-// Noise‑фильтр контекста (EMA, RSI, MACD, объём, Fibo) [web:69][web:83][web:72][web:78]
-function computeNisonContextScore(candle, trendDirection) {
-  let score = 0;
-  const close = candle.close;
-  const ema200 = candle.ema200;
-  const rsi = candle.rsi;
-  const macdHist = candle.macdHist;
-  const volume = candle.volume;
-  const avgVolume = candle.avgVolume;
-  const support = candle.supportLevel;
-  const resistance = candle.resistanceLevel;
-
-  if (trendDirection === "DOWN") {
-    if (close < ema200) score += 0.2;
-  } else if (trendDirection === "UP") {
-    if (close > ema200) score += 0.2;
-  }
-
-  if (support !== null && support !== undefined && close <= support * 1.01) {
-    score += 0.2;
-  }
-  if (resistance !== null && resistance !== undefined && close >= resistance * 0.99) {
-    score += 0.2;
-  }
-
-  if (avgVolume && volume >= avgVolume * 1.2) {
-    score += 0.2;
-  }
-
-  if (trendDirection === "DOWN") {
-    if (rsi <= 35) score += 0.1;
-    if (macdHist > 0) score += 0.1;
-  } else if (trendDirection === "UP") {
-    if (rsi >= 65) score += 0.1;
-    if (macdHist < 0) score += 0.1;
-  }
-
-  return score;
-}
-
-function detectNisonPatternWithContext(klines, index, trendDirection) {
-  const res = {
-    pattern: null,
-    direction: null,
-    score: 0,
-    description: ""
-  };
-
-  const c0 = klines[index];
-  const c1 = klines[index - 1];
-  const c2 = klines[index - 2];
-  if (!c0 || !c1 || !c2) return res;
-
-  if (isHammer(c0) || isBullishEngulfing(c1, c0) || isMorningStar(c2, c1, c0)) {
-    const ctxScore = computeNisonContextScore(c0, "DOWN");
-    res.pattern = isHammer(c0)
-      ? "HAMMER"
-      : isBullishEngulfing(c1, c0)
-      ? "BULLISH_ENGULFING"
-      : "MORNING_STAR";
-    res.direction = "LONG";
-    res.score = ctxScore;
-    res.description = `Bullish ${res.pattern} (score ${ctxScore.toFixed(2)})`;
-    return res;
-  }
-
-  if (isShootingStar(c0) || isBearishEngulfing(c1, c0) || isEveningStar(c2, c1, c0)) {
-    const ctxScore = computeNisonContextScore(c0, "UP");
-    res.pattern = isShootingStar(c0)
-      ? "SHOOTING_STAR"
-      : isBearishEngulfing(c1, c0)
-      ? "BEARISH_ENGULFING"
-      : "EVENING_STAR";
-    res.direction = "SHORT";
-    res.score = ctxScore;
-    res.description = `Bearish ${res.pattern} (score ${ctxScore.toFixed(2)})`;
-    return res;
-  }
-
-  return res;
-}
-
-// =============== H1 SIGNALS (RSI+MACD+NISON) ===============
-function should_long_ERAUSDT_1h(klines) {
-  const n = klines.length;
-  if (n < 3) return { bias: "NEUTRAL", reasons: [] };
-  const last = klines[n - 1];
-  const rsi = last.rsi;
-  const macdHist = last.macdHist;
-  const ema200 = last.ema200;
-  const reasons = [];
-
-  if (last.close > ema200) reasons.push("Price above EMA200 (uptrend H1)");
-  if (macdHist > 0) reasons.push("MACD histogram > 0 (bullish momentum)");
-  if (rsi > 40 && rsi < 70) reasons.push("RSI in healthy bullish range");
-
-  const patternInfo = detectNisonPatternWithContext(klines, n - 1, "DOWN");
-  if (patternInfo.pattern && patternInfo.direction === "LONG" && patternInfo.score >= 0.6) {
-    reasons.push(`Nison bullish pattern: ${patternInfo.pattern} (score ${patternInfo.score.toFixed(2)})`);
-  }
-
-  const hasTrend = last.close > ema200 && macdHist > 0;
-  const hasCandle = patternInfo.pattern && patternInfo.direction === "LONG" && patternInfo.score >= 0.6;
-
-  let bias = "NEUTRAL";
-  if (hasTrend && hasCandle) bias = "STRONG_LONG";
-  else if (hasTrend) bias = "LONG";
-
-  return { bias, reasons };
-}
-
-function should_short_ERAUSDT_1h(klines) {
-  const n = klines.length;
-  if (n < 3) return { bias: "NEUTRAL", reasons: [] };
-  const last = klines[n - 1];
-  const rsi = last.rsi;
-  const macdHist = last.macdHist;
-  const ema200 = last.ema200;
-  const reasons = [];
-
-  if (last.close < ema200) reasons.push("Price below EMA200 (downtrend H1)");
-  if (macdHist < 0) reasons.push("MACD histogram < 0 (bearish momentum)");
-  if (rsi < 60 && rsi > 30) reasons.push("RSI in healthy bearish range");
-
-  const patternInfo = detectNisonPatternWithContext(klines, n - 1, "UP");
-  if (patternInfo.pattern && patternInfo.direction === "SHORT" && patternInfo.score >= 0.6) {
-    reasons.push(`Nison bearish pattern: ${patternInfo.pattern} (score ${patternInfo.score.toFixed(2)})`);
-  }
-
-  const hasTrend = last.close < ema200 && macdHist < 0;
-  const hasCandle = patternInfo.pattern && patternInfo.direction === "SHORT" && patternInfo.score >= 0.6;
-
-  let bias = "NEUTRAL";
-  if (hasTrend && hasCandle) bias = "STRONG_SHORT";
-  else if (hasTrend) bias = "SHORT";
-
-  return { bias, reasons };
-}
-
-function classifyAdvancedERA(klinesH1) {
-  const longSig = should_long_ERAUSDT_1h(klinesH1);
-  const shortSig = should_short_ERAUSDT_1h(klinesH1);
-
-  let h1Bias = "NEUTRAL";
-  let h1Reasons = [];
-
-  if (longSig.bias === "STRONG_LONG") {
-    h1Bias = "STRONG_LONG";
-    h1Reasons = longSig.reasons;
-  } else if (shortSig.bias === "STRONG_SHORT") {
-    h1Bias = "STRONG_SHORT";
-    h1Reasons = shortSig.reasons;
-  } else if (longSig.bias === "LONG") {
-    h1Bias = "LONG";
-    h1Reasons = longSig.reasons;
-  } else if (shortSig.bias === "SHORT") {
-    h1Bias = "SHORT";
-    h1Reasons = shortSig.reasons;
-  }
-
-  return { h1Bias, h1Reasons };
-}
-
-function updateSignalUIERA(classification) {
-  const box = document.getElementById("era-h1-signal-box");
-  const list = document.getElementById("era-h1-reasons");
-  box.textContent = "H1: " + classification.h1Bias;
-
-  box.classList.remove("signal-long", "signal-short", "signal-neutral");
-  if (classification.h1Bias.includes("LONG")) box.classList.add("signal-long");
-  else if (classification.h1Bias.includes("SHORT")) box.classList.add("signal-short");
-  else box.classList.add("signal-neutral");
-
-  list.innerHTML = "";
-  classification.h1Reasons.forEach(r => {
-    const li = document.createElement("li");
-    li.textContent = "[ERA H1] " + r;
-    list.appendChild(li);
-  });
-}
-
-// =============== CURRENT TF LONG/SHORT SIGNALS ===============
-// Простая логика: EMA‑фильтр тренда + MACD направление + RSI состояние + Fibo‑контекст [web:72][web:69][web:78][web:83]
-function computeTfSignals(klines, fiboContext) {
-  const res = { bias: "NEUTRAL", reasons: [] };
-  const n = klines.length;
-  if (n < 3) return res;
-
-  const last = klines[n - 1];
-  const rsi = last.rsi;
-  const macd = last.macd;
-  const macdSignal = last.macdSignal;
-  const ema = last.ema200;
-  const close = last.close;
-  const support = fiboContext.support;
-  const resistance = fiboContext.resistance;
-
-  const reasons = [];
-
-  const macdBull = macd !== null && macdSignal !== null && macd > macdSignal;
-  const macdBear = macd !== null && macdSignal !== null && macd < macdSignal;
-
-  const emaUp = ema && close > ema;
-  const emaDown = ema && close < ema;
-
-  const rsiBull = rsi && rsi > 40 && rsi < 70;
-  const rsiBear = rsi && rsi > 30 && rsi < 60 && rsi > 50;
-
-  const nearSupport = support && close <= support * 1.01;
-  const nearResistance = resistance && close >= resistance * 0.99;
-
-  if (emaUp) reasons.push("Price above EMA200 (trend up)");
-  if (emaDown) reasons.push("Price below EMA200 (trend down)");
-
-  if (macdBull) reasons.push("MACD > Signal (bullish)");
-  if (macdBear) reasons.push("MACD < Signal (bearish)");
-
-  if (rsiBull) reasons.push("RSI in bullish range");
-  if (rsiBear) reasons.push("RSI in bearish range");
-
-  if (nearSupport) reasons.push("Price near Fibo support zone");
-  if (nearResistance) reasons.push("Price near Fibo resistance zone");
-
-  let bias = "NEUTRAL";
-  if (emaUp && macdBull && rsiBull && nearSupport) bias = "LONG";
-  else if (emaDown && macdBear && rsiBear && nearResistance) bias = "SHORT";
-
-  res.bias = bias;
-  res.reasons = reasons;
-  return res;
-}
-
-function updateTfSignalUI(tfSignal) {
-  const box = document.getElementById("tf-signal-box");
-  const list = document.getElementById("tf-signal-reasons");
-  box.textContent = `Current TF (${currentInterval}m): ${tfSignal.bias}`;
-
-  list.innerHTML = "";
-  tfSignal.reasons.forEach(r => {
-    const li = document.createElement("li");
-    li.textContent = `[TF ${currentInterval}m] ` + r;
-    list.appendChild(li);
-  });
-}
-
-// =============== RENDER PLOTS ===============
-function renderPriceChart(klines) {
-  const times = klines.map(c => new Date(c.time));
-  const traceCandles = {
-    x: times,
-    open: klines.map(c => c.open),
-    high: klines.map(c => c.high),
-    low: klines.map(c => c.low),
-    close: klines.map(c => c.close),
-    type: "candlestick",
-    name: SYMBOL,
-    increasing: { line: { color: "#22c55e" } },
-    decreasing: { line: { color: "#ef4444" } }
-  };
-
-  const layout = {
-    margin: { t: 20, l: 40, r: 10, b: 30 },
-    paper_bgcolor: "#0e1117",
-    plot_bgcolor: "#0e1117",
-    xaxis: { gridcolor: "#262d38", rangeslider: { visible: false } },
-    yaxis: { gridcolor: "#262d38" }
-  };
-
-  Plotly.newPlot("price-chart", [traceCandles], layout, {responsive: true, displayModeBar: false});
-}
-
-function renderRSIMACDCharts(klinesH1) {
-  const times = klinesH1.map(c => new Date(c.time));
-  const rsiValues = klinesH1.map(c => c.rsi);
-  const macdValues = klinesH1.map(c => c.macd);
-  const macdSignal = klinesH1.map(c => c.macdSignal);
-  const macdHist = klinesH1.map(c => c.macdHist);
-
-  Plotly.newPlot("rsi-chart", [{
-    x: times,
-    y: rsiValues,
-    type: "scatter",
-    mode: "lines",
-    line: { color: "#3b82f6" },
-    name: "RSI(14)"
-  }], {
-    margin: { t: 10, l: 40, r: 10, b: 20 },
-    paper_bgcolor: "#111827",
-    plot_bgcolor: "#111827",
-    yaxis: { gridcolor: "#1f2937", range: [0, 100] },
-    xaxis: { gridcolor: "#1f2937" }
-  }, {responsive: true, displayModeBar: false});
-
-  Plotly.newPlot("macd-chart", [
-    {
-      x: times,
-      y: macdValues,
-      type: "scatter",
-      mode: "lines",
-      line: { color: "#22c55e" },
-      name: "MACD"
-    },
-    {
-      x: times,
-      y: macdSignal,
-      type: "scatter",
-      mode: "lines",
-      line: { color: "#e5e7eb" },
-      name: "Signal"
-    },
-    {
-      x: times,
-      y: macdHist,
-      type: "bar",
-      marker: { color: "#f97316" },
-      name: "Hist"
+    async function fetchKlines(interval = currentInterval, limit = 200){
+      const res = await fetch(`${REST}/kline?category=linear&symbol=${SYMBOL}&interval=${interval}&limit=${limit}`);
+      const res = await fetch(`${REST_BASE}/fapi/v1/klines?symbol=${SYMBOL}&interval=${TF_KLINE[interval]}&limit=${limit}`);
+      const j = await res.json();
+      return j.result.list.reverse().map(k => ({
+        time: new Date(parseInt(k[0])),
+      return j.map(k => ({
+        time: new Date(k[0]),
+        open: parseFloat(k[1]),
+        high: parseFloat(k[2]),
+        low: parseFloat(k[3]),
+@@ -430,105 +434,267 @@
+      return { long:false, short:false, text:`цена у нейтрального Fib ${nearest.level}` };
     }
-  ], {
-    margin: { t: 10, l: 40, r: 10, b: 20 },
-    paper_bgcolor: "#111827",
-    plot_bgcolor: "#111827",
-    yaxis: { gridcolor: "#1f2937" },
-    xaxis: { gridcolor: "#1f2937" }
-  }, {responsive: true, displayModeBar: false});
-}
 
-function renderFiboChart(klinesH1) {
-  const times = klinesH1.map(c => new Date(c.time));
-  const closes = klinesH1.map(c => c.close);
-  const fibo = computeFiboLevels(klinesH1);
+    function should_long_ERAUSDT_1h(ctx){
+      const rsi    = ctx.rsiLast;
+      const macd   = ctx.macdLast;
+      const signal = ctx.signalLast;
+      const hist   = ctx.histLast;
+      const price  = ctx.closeLast;
+      const sma20  = ctx.sma20Last;
+      const sma50  = ctx.sma50Last;
 
-  const priceTrace = {
-    x: times,
-    y: closes,
-    type: "scatter",
-    mode: "lines",
-    name: "Close",
-    line: { color: "#22c55e" }
-  };
+      const rsi_ok =
+        rsi != null &&
+        rsi > 50 &&
+        rsi < 70;
 
-  const fiboTraces = fibo.map(f => ({
-    x: [times[0], times[times.length - 1]],
-    y: [f.price, f.price],
-    type: "scatter",
-    mode: "lines",
-    name: `Fib ${Math.round(f.level * 100)}%`,
-    line: { dash: "dot", width: 1, color: "#9ca3af" }
-  }));
+      const macd_bull =
+        macd != null && signal != null && hist != null &&
+        macd > signal &&
+        hist > 0;
 
-  Plotly.newPlot("fibo-chart", [priceTrace, ...fiboTraces], {
-    margin: { t: 10, l: 40, r: 10, b: 20 },
-    paper_bgcolor: "#111827",
-    plot_bgcolor: "#111827",
-    xaxis: { gridcolor: "#1f2937" },
-    yaxis: { gridcolor: "#1f2937" }
-  }, {responsive: true, displayModeBar: false});
+      const trend_ok =
+        sma20 == null || sma50 == null
+          ? true
+          : (price > sma20 && sma20 >= sma50);
 
-  return fibo;
-}
+      const ok = rsi_ok && macd_bull && trend_ok;
 
-// =============== MAIN PIPELINE ===============
-async function fetchAndRender() {
-  try {
-    const klines = await fetchKlines(currentInterval, 200);
-    if (klines.length === 0) return;
+      const reasons = [];
+      if (!rsi_ok)    reasons.push("RSI ERAUSDT на H1 не в бычьей зоне 50–70");
+      if (!macd_bull) reasons.push("MACD ERAUSDT на H1 не даёт устойчивый бычий сигнал");
+      if (!trend_ok)  reasons.push("Цена/SMA для ERAUSDT не подтверждают восходящий тренд");
 
-    const closes = klines.map(c => c.close);
-    const rsis = calcRSI(closes, 14);
-    const ema200 = calcEMA(closes, 200);
-    const macdData = calcMACD(closes, 12, 26, 9);
+      return {
+        shouldLong: ok,
+        reasons: ok
+          ? ["ERAUSDT H1: RSI 50–70, MACD > Signal, hist > 0, тренд восходящий"]
+          : reasons
+      };
+    }
 
-    let volumeSum = 0;
-    klines.forEach((c, i) => {
-      c.rsi = rsis[i] || null;
-      c.ema200 = ema200[i] || null;
-      c.macd = macdData.macd[i] || null;
-      c.macdSignal = macdData.signalLine[i] || null;
-      c.macdHist = macdData.hist[i] || null;
-      volumeSum += c.volume;
-      c.avgVolume = volumeSum / (i + 1);
-      // Fibo‑уровни для текущего ТФ можно добавить при желании,
-      // но основной контекст уровней мы считаем на H1 ниже.
-      c.supportLevel = null;
-      c.resistanceLevel = null;
-    });
+    function should_short_ERAUSDT_1h(ctx){
+      const rsi    = ctx.rsiLast;
+      const macd   = ctx.macdLast;
+      const signal = ctx.signalLast;
+      const hist   = ctx.histLast;
+      const price  = ctx.closeLast;
+      const sma20  = ctx.sma20Last;
+      const sma50  = ctx.sma50Last;
 
-    renderPriceChart(klines);
+      const rsi_overbought =
+        rsi != null && rsi > 70;
 
-    // H1‑сигналы и Fibo‑уровни
-    const h1Klines = currentInterval === 60 ? klines : await fetchKlines(60, 200);
-    if (h1Klines.length > 0) {
-      const h1Closes = h1Klines.map(c => c.close);
-      const h1Rsis = calcRSI(h1Closes, 14);
-      const h1Ema200 = calcEMA(h1Closes, 200);
-      const h1Macd = calcMACD(h1Closes, 12, 26, 9);
+      const rsi_bear_bias =
+        rsi != null && rsi < 50;
 
-      let volSumH1 = 0;
-      h1Klines.forEach((c, i) => {
-        c.rsi = h1Rsis[i] || null;
-        c.ema200 = h1Ema200[i] || null;
-        c.macd = h1Macd.macd[i] || null;
-        c.macdSignal = h1Macd.signalLine[i] || null;
-        c.macdHist = h1Macd.hist[i] || null;
-        volSumH1 += c.volume;
-        c.avgVolume = volSumH1 / (i + 1);
-        c.supportLevel = null;
-        c.resistanceLevel = null;
+      const rsi_ok = rsi_overbought || rsi_bear_bias;
+
+      const macd_bear =
+        macd != null && signal != null && hist != null &&
+        macd < signal &&
+        hist < 0;
+
+      const trend_ok =
+        sma20 == null || sma50 == null
+          ? true
+          : (price < sma20 && sma20 <= sma50);
+
+      const ok = rsi_ok && macd_bear && trend_ok;
+
+      const reasons = [];
+      if (!rsi_ok)    reasons.push("RSI ERAUSDT на H1 не даёт медвежьего сигнала (нет перекупленности, rsi >=50)");
+      if (!macd_bear) reasons.push("MACD ERAUSDT на H1 не подтверждает медвежий импульс");
+      if (!trend_ok)  reasons.push("Цена/SMA для ERAUSDT не подтверждают нисходящий тренд");
+
+      return {
+        shouldShort: ok,
+        reasons: ok
+          ? ["ERAUSDT H1: RSI перекуплен или ниже 50, MACD < Signal, hist < 0, тренд нисходящий"]
+          : reasons
+      };
+    }
+
+    function classifyAdvanced(kl, rsis, macdObj, fiboLevels, tf){
+      const closes = kl.map(k => k.close);
+      const closes  = kl.map(k => k.close);
+      const volumes = kl.map(k => k.volume);
+      const last = closes[closes.length - 1];
+      const prev = closes[closes.length - 2] ?? last;
+      const last    = closes[closes.length - 1];
+      const prev    = closes[closes.length - 2] ?? last;
+
+      const rsiLast = rsis[rsis.length - 1];
+      const macdLast = macdObj.macd[macdObj.macd.length - 1];
+      const rsiLast    = rsis[rsis.length - 1];
+      const macdLast   = macdObj.macd[macdObj.macd.length - 1];
+      const signalLast = macdObj.signal[macdObj.signal.length - 1];
+      const histLast = macdObj.hist[macdObj.hist.length - 1];
+      const histLast   = macdObj.hist[macdObj.hist.length - 1];
+
+      const sma20 = sma(closes, 20);
+      const sma50 = sma(closes, 50);
+      const ema9 = ema(closes, 9);
+      const ema21 = ema(closes, 21);
+      const atr14 = calcATR(kl, 14);
+      const sma20Arr = sma(closes, 20);
+      const sma50Arr = sma(closes, 50);
+      const ema9Arr  = ema(closes, 9);
+      const ema21Arr = ema(closes, 21);
+      const atr14Arr = calcATR(kl, 14);
+      const avgVol20 = sma(volumes, 20);
+      const candle = detectCandleSignal(kl);
+      const fibBias = nearestFiboBias(last, fiboLevels);
+      const candle   = detectCandleSignal(kl);
+      const fibBias  = nearestFiboBias(last, fiboLevels);
+
+      let longScore = 0;
+      const sma20Last  = sma20Arr[sma20Arr.length - 1];
+      const sma50Last  = sma50Arr[sma50Arr.length - 1];
+      const ema9Last   = ema9Arr[ema9Arr.length - 1];
+      const ema21Last  = ema21Arr[ema21Arr.length - 1];
+      const avgVolLast = avgVol20[avgVol20.length - 1];
+      const atrNow     = atr14Arr[atr14Arr.length - 1] ?? null;
+
+      let longScore  = 0;
+      let shortScore = 0;
+      const reasons = [];
+      const reasons  = [];
+
+      if (rsiLast != null) {
+        if (rsiLast < 32) { longScore += 2; reasons.push("RSI в перепроданности"); }
+        else if (rsiLast > 68) { shortScore += 2; reasons.push("RSI в перекупленности"); }
+        else if (rsiLast > 50) { longScore += 1; reasons.push("RSI выше 50"); }
+        else { shortScore += 1; reasons.push("RSI ниже 50"); }
+        if (rsiLast < 32) {
+          longScore += 2;
+          reasons.push("RSI ERAUSDT в перепроданности");
+        } else if (rsiLast > 68) {
+          shortScore += 2;
+          reasons.push("RSI ERAUSDT в перекупленности");
+        } else if (rsiLast > 50) {
+          longScore += 1;
+          reasons.push("RSI ERAUSDT выше 50");
+        } else {
+          shortScore += 1;
+          reasons.push("RSI ERAUSDT ниже 50");
+        }
+      }
+
+      if (macdLast > signalLast && histLast > 0) { longScore += 2; reasons.push("MACD bullish"); }
+      if (macdLast < signalLast && histLast < 0) { shortScore += 2; reasons.push("MACD bearish"); }
+
+      const sma20Last = sma20[sma20.length - 1];
+      const sma50Last = sma50[sma50.length - 1];
+      const ema9Last = ema9[ema9.length - 1];
+      const ema21Last = ema21[ema21.length - 1];
+      const avgVolLast = avgVol20[avgVol20.length - 1];
+      if (macdLast > signalLast && histLast > 0) {
+        longScore += 2;
+        reasons.push("MACD ERAUSDT bullish");
+      }
+      if (macdLast < signalLast && histLast < 0) {
+        shortScore += 2;
+        reasons.push("MACD ERAUSDT bearish");
+      }
+
+      if (sma20Last != null) {
+        if (last > sma20Last) { longScore += 1; reasons.push("Цена выше SMA20"); }
+        else { shortScore += 1; reasons.push("Цена ниже SMA20"); }
+        if (last > sma20Last) {
+          longScore += 1;
+          reasons.push("ERAUSDT цена выше SMA20");
+        } else {
+          shortScore += 1;
+          reasons.push("ERAUSDT цена ниже SMA20");
+        }
+      }
+
+      if (sma20Last != null && sma50Last != null) {
+        if (sma20Last > sma50Last) { longScore += 1; reasons.push("SMA20 выше SMA50"); }
+        else { shortScore += 1; reasons.push("SMA20 ниже SMA50"); }
+        if (sma20Last > sma50Last) {
+          longScore += 1;
+          reasons.push("SMA20 ERAUSDT выше SMA50");
+        } else {
+          shortScore += 1;
+          reasons.push("SMA20 ERAUSDT ниже SMA50");
+        }
+      }
+
+      if (ema9Last != null && ema21Last != null) {
+        if (ema9Last > ema21Last) { longScore += 1; reasons.push("EMA9 выше EMA21"); }
+        else { shortScore += 1; reasons.push("EMA9 ниже EMA21"); }
+        if (ema9Last > ema21Last) {
+          longScore += 1;
+          reasons.push("EMA9 ERAUSDT выше EMA21");
+        } else {
+          shortScore += 1;
+          reasons.push("EMA9 ERAUSDT ниже EMA21");
+        }
+      }
+
+      if (avgVolLast != null && avgVolLast > 0 && volumes[volumes.length - 1] > avgVolLast * 1.2) {
+        if (last > prev) { longScore += 1; reasons.push("Рост на повышенном объёме"); }
+        if (last < prev) { shortScore += 1; reasons.push("Снижение на повышенном объёме"); }
+      if (avgVolLast != null && avgVolLast > 0 &&
+          volumes[volumes.length - 1] > avgVolLast * 1.2) {
+        if (last > prev) {
+          longScore += 1;
+          reasons.push("ERAUSDT рост на повышенном объёме");
+        }
+        if (last < prev) {
+          shortScore += 1;
+          reasons.push("ERAUSDT снижение на повышенном объёме");
+        }
+      }
+
+      if (candle.bull) { longScore += 2; reasons.push(`Свечной паттерн: ${candle.name}`); }
+      if (candle.bear) { shortScore += 2; reasons.push(`Свечной паттерн: ${candle.name}`); }
+      if (candle.bull) {
+        longScore += 2;
+        reasons.push(`Свечной паттерн ERAUSDT: ${candle.name}`);
+      }
+      if (candle.bear) {
+        shortScore += 2;
+        reasons.push(`Свечной паттерн ERAUSDT: ${candle.name}`);
+      }
+
+      if (fibBias.long) { longScore += 1; reasons.push(fibBias.text); }
+      if (fibBias.short) { shortScore += 1; reasons.push(fibBias.text); }
+      if (fibBias.long)  {
+        longScore += 1;
+        reasons.push(fibBias.text);
+      }
+      if (fibBias.short) {
+        shortScore += 1;
+        reasons.push(fibBias.text);
+      }
+
+      let setupTf = "15m";
+      if (tf === "60") setupTf = "5m–15m";
+      if (tf === "240") setupTf = "15m–1h";
+      if (tf === "15") setupTf = "5m";
+      if (tf === "5") setupTf = "5m";
+      if (tf === "1h")  setupTf = "5m–15m";
+      if (tf === "4h")  setupTf = "15m–1h";
+      if (tf === "15m") setupTf = "5m";
+      if (tf === "5m")  setupTf = "5m";
+
+      const atrNow = atr14[atr14.length - 1] ?? null;
+      const entry = last;
+      let sl = null, tp1 = null, tp2 = null;
+      let label = "NEUTRAL", cls = "sig-neutral";
+
+      if (longScore - shortScore >= 6) { label = "STRONG LONG"; cls = "sig-long"; }
+      else if (longScore - shortScore >= 3) { label = "LONG"; cls = "sig-long"; }
+      let sl  = null;
+      let tp1 = null;
+      let tp2 = null;
+      let label = "NEUTRAL";
+      let cls   = "sig-neutral";
+
+      if (longScore - shortScore >= 6)      { label = "STRONG LONG";  cls = "sig-long"; }
+      else if (longScore - shortScore >= 3) { label = "LONG";         cls = "sig-long"; }
+      else if (shortScore - longScore >= 6) { label = "STRONG SHORT"; cls = "sig-short"; }
+      else if (shortScore - longScore >= 3) { label = "SHORT"; cls = "sig-short"; }
+      else if (shortScore - longScore >= 3) { label = "SHORT";        cls = "sig-short"; }
+
+      if (atrNow != null) {
+        if (label.includes("LONG")) {
+          sl = entry - atrNow * 1.2;
+          sl  = entry - atrNow * 1.2;
+          tp1 = entry + atrNow * 1.5;
+          tp2 = entry + atrNow * 2.5;
+        } else if (label.includes("SHORT")) {
+          sl = entry + atrNow * 1.2;
+          sl  = entry + atrNow * 1.2;
+          tp1 = entry - atrNow * 1.5;
+          tp2 = entry - atrNow * 2.5;
+        }
+      }
+
+      const ctx = {
+        rsiLast,
+        macdLast,
+        signalLast,
+        histLast,
+        closeLast: entry,
+        sma20Last,
+        sma50Last
+      };
+
+      const longDecision  = should_long_ERAUSDT_1h(ctx);
+      const shortDecision = should_short_ERAUSDT_1h(ctx);
+
+      let h1Bias = "NEUTRAL";
+      const h1Reasons = [];
+
+      if (longDecision.shouldLong && !shortDecision.shouldShort) {
+        h1Bias = "LONG";
+        h1Reasons.push(...longDecision.reasons);
+      } else if (shortDecision.shouldShort && !longDecision.shouldLong) {
+        h1Bias = "SHORT";
+        h1Reasons.push(...shortDecision.reasons);
+      } else {
+        h1Bias = "NEUTRAL";
+        h1Reasons.push("RSI+MACD ERAUSDT на H1 не дают однозначного long/short");
+        h1Reasons.push(...longDecision.reasons, ...shortDecision.reasons);
+      }
+
+      return {
+        label, cls, longScore, shortScore, reasons,
+        entry, sl, tp1, tp2, atrNow, setupTf,
+        rsiLast, macdLast, signalLast, histLast,
+        sma20Last, sma50Last, ema9Last, ema21Last
+        sma20Last, sma50Last, ema9Last, ema21Last,
+        h1Bias, h1Reasons
+      };
+    }
+
+@@ -771,14 +937,14 @@
+        SMA50: <b>${fmt(sig.sma50Last)}</b>,
+        EMA9: <b>${fmt(sig.ema9Last)}</b>,
+        EMA21: <b>${fmt(sig.ema21Last)}</b>,
+        ATR14: <b>${sig.atrNow != null ? fmt(sig.atrNow) : "-"}</b>
+        ATR14: <b>${sig.atrNow != null ? fmt(sig.atrNow) : "-"}</b><br>
+        H1 bias ERAUSDT (RSI+MACD): <b>${sig.h1Bias}</b>
+      `;
+
+      document.getElementById("signalDetails").innerHTML = `
+        Score Long/Short: <b>${sig.longScore}/${sig.shortScore}</b><br>
+        Интерпретация: текущий таймфрейм <b>${TF_LABELS[currentInterval]}</b> задаёт рабочий контекст,
+        а рекомендуемый таймфрейм входа — <b>${sig.setupTf}</b>. 
+        Entry/SL/TP рассчитываются от текущей цены и ATR, поэтому значения адаптируются к волатильности.
+        H1 bias используется как фильтр: входы на 5m–15m допускаются, когда bias LONG/SHORT согласован
+        с консолидированным сигналом дашборда.
+      `;
+
+      const list = document.getElementById("reasonsList");
+@@ -788,15 +954,20 @@
+        li.textContent = r;
+        list.appendChild(li);
       });
-
-      const fiboLevels = renderFiboChart(h1Klines);
-      const fibContext = computeFibSupportResistanceFromRange(fiboLevels);
-
-      // заполняем Fibo‑support/resistance в последнюю H1‑свечу для контекста паттернов
-      const lastH1 = h1Klines[h1Klines.length - 1];
-      lastH1.supportLevel = fibContext.support;
-      lastH1.resistanceLevel = fibContext.resistance;
-
-      const classification = classifyAdvancedERA(h1Klines);
-      updateSignalUIERA(classification);
-      renderRSIMACDCharts(h1Klines);
-
-      // текущий TF‑сигнал (LONG/SHORT/NEUTRAL) по RSI/MACD/EMA + Fibo‑контекст
-      const tfSignal = computeTfSignals(klines, fibContext);
-      updateTfSignalUI(tfSignal);
+      sig.h1Reasons.forEach(r => {
+        const li = document.createElement("li");
+        li.textContent = "[ERA H1] " + r;
+        list.appendChild(li);
+      });
     }
-  } catch (e) {
-    console.error("Error in fetchAndRender", e);
-  }
-}
 
-// init
-fetchAndRender();
-setInterval(fetchAndRender, 60 * 1000); // обновление раз в минуту
-</script>
+    function recalcAndRenderFromKlines(lastPriceOverride = null){
+      if (!klineData.length) return;
+
+      const closes = klineData.map(k => k.close);
+      const highs = klineData.map(k => k.high);
+      const lows = klineData.map(k => k.low);
+      const rsis = calcRSI(closes, 14);
+      const highs  = klineData.map(k => k.high);
+      const lows   = klineData.map(k => k.low);
+      const rsis   = calcRSI(closes, 14);
+      const macdObj = calcMACD(closes);
+      const fiboLevels = calcFibo(highs, lows);
+      const lastPrice = lastPriceOverride ?? closes[closes.length - 1];
+@@ -819,7 +990,7 @@
+
+    async function updateDashboardREST(){
+      try{
+        document.getElementById("status").textContent = `Загрузка данных Bybit (${TF_LABELS[currentInterval]})...`;
+        document.getElementById("status").textContent = `Загрузка данных Binance (${TF_LABELS[currentInterval]})...`;
+
+        const [ticker, kl] = await Promise.all([
+          fetchTicker(),
+@@ -829,16 +1000,19 @@
+        klineData = kl;
+
+        const lastPrice = parseFloat(ticker.lastPrice);
+        const chg24 = parseFloat(ticker.price24hPcnt);
+        const funding = parseFloat(ticker.fundingRate);
+        const oi = parseFloat(ticker.openInterest);
+        const chg24 = parseFloat(ticker.priceChangePercent);
+        const high  = parseFloat(ticker.highPrice);
+        const low   = parseFloat(ticker.lowPrice);
+        const mark  = parseFloat(ticker.lastPrice); // для простоты mark ~ last
+
+        document.getElementById("price").textContent = Number.isFinite(lastPrice) ? lastPrice.toFixed(6) : "-";
+        document.getElementById("chg24").textContent = Number.isFinite(chg24) ? (chg24 * 100).toFixed(2) + "%" : "-";
+        document.getElementById("chg24").textContent = Number.isFinite(chg24) ? chg24.toFixed(2) + "%" : "-";
+        document.getElementById("chg24").className = "value " + (chg24 >= 0 ? "green" : "red");
+        document.getElementById("funding").textContent = Number.isFinite(funding) ? (funding * 100).toFixed(4) + "%" : "-";
+        document.getElementById("funding").className = "value " + (funding >= 0 ? "yellow" : "blue");
+        document.getElementById("oi").textContent = Number.isFinite(oi) ? oi.toFixed(0) : "-";
+        document.getElementById("mark").textContent  = Number.isFinite(mark) ? mark.toFixed(6) : "-";
+        document.getElementById("hiLo").textContent  =
+          (Number.isFinite(high) && Number.isFinite(low))
+            ? `${high.toFixed(6)} / ${low.toFixed(6)}`
+            : "-";
+
+        recalcAndRenderFromKlines(lastPrice);
+        document.getElementById("status").textContent = `Обновлено (REST): ${new Date().toLocaleString()}`;
+@@ -848,119 +1022,72 @@
+      }
+    }
+
+    function applyTickerUpdate(t){
+      if (!t) return;
+
+      if (t.lastPrice != null) {
+        const lastPrice = parseFloat(t.lastPrice);
+        if (Number.isFinite(lastPrice)) {
+          document.getElementById("price").textContent = lastPrice.toFixed(6);
+        }
+      }
+
+      if (t.price24hPcnt != null) {
+        const chg24 = parseFloat(t.price24hPcnt);
+        if (Number.isFinite(chg24)) {
+          document.getElementById("chg24").textContent = (chg24 * 100).toFixed(2) + "%";
+          document.getElementById("chg24").className = "value " + (chg24 >= 0 ? "green" : "red");
+        }
+      }
+
+      if (t.fundingRate != null) {
+        const funding = parseFloat(t.fundingRate);
+        if (Number.isFinite(funding)) {
+          document.getElementById("funding").textContent = (funding * 100).toFixed(4) + "%";
+        }
+      }
+
+      if (t.openInterest != null) {
+        const oi = parseFloat(t.openInterest);
+        if (Number.isFinite(oi)) {
+          document.getElementById("oi").textContent = oi.toFixed(0);
+        }
+      }
+    }
+
+    function applyKlineUpdate(k){
+      if (!k) return;
+      const startRaw = k.start ?? k.startTime;
+      if (startRaw == null) return;
+
+      const candle = {
+        time: new Date(parseInt(startRaw)),
+        open: parseFloat(k.open),
+        high: parseFloat(k.high),
+        low: parseFloat(k.low),
+        close: parseFloat(k.close),
+        volume: parseFloat(k.volume)
+      };
+
+      if (!klineData.length) {
+        klineData.push(candle);
+        recalcAndRenderFromKlines(candle.close);
+        return;
+      }
+
+      const incomingTime = +candle.time;
+      const lastExistingTime = +klineData[klineData.length - 1].time;
+
+      if (k.confirm === true) {
+        if (incomingTime > lastExistingTime) {
+          klineData.push(candle);
+          if (klineData.length > 200) klineData.shift();
+        } else {
+          klineData[klineData.length - 1] = candle;
+        }
+      } else {
+        if (incomingTime >= lastExistingTime) {
+          klineData[klineData.length - 1] = candle;
+        }
+      }
+
+      recalcAndRenderFromKlines(candle.close);
+    }
+
+    function clearWsTimers(){
+      if (pingTimer) {
+        clearInterval(pingTimer);
+        pingTimer = null;
+    function clearWs(){
+      if (wsInstance) {
+        try { wsInstance.close(); } catch(e){}
+        wsInstance = null;
+      }
+    }
+
+    function initWebSocket(){
+      try{
+        if (wsInstance && wsInstance.readyState === WebSocket.OPEN) return;
+
+        const ws = new WebSocket(WS_PUBLIC_LINEAR);
+        clearWs();
+        const streams = [
+          `${SYMBOL.toLowerCase()}@ticker`,
+          `${SYMBOL.toLowerCase()}@kline_${TF_KLINE[currentInterval]}`
+        ].join("/");
+        const ws = new WebSocket(`${WS_BASE}?streams=${streams}`);
+        wsInstance = ws;
+
+        ws.onopen = () => {
+          ws.send(JSON.stringify({ op:"subscribe", args:[`tickers.${SYMBOL}`] }));
+          ws.send(JSON.stringify({ op:"subscribe", args:[`kline.${currentInterval}.${SYMBOL}`] }));
+
+          clearWsTimers();
+          pingTimer = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ op:"ping" }));
+            }
+          }, 20000);
+
+          document.getElementById("status").textContent =
+            `WebSocket подключён: tickers.${SYMBOL}, kline.${currentInterval}.${SYMBOL}`;
+            `WebSocket подключён: ${streams}`;
+        };
+
+        ws.onmessage = (ev) => {
+          try{
+            const data = JSON.parse(ev.data);
+
+            if (data.topic && data.topic.startsWith("tickers.")) {
+              const t = Array.isArray(data.data) ? data.data[0] : data.data;
+              applyTickerUpdate(t);
+            const stream = data.stream;
+            const payload = data.data;
+
+            if (stream && stream.includes("@ticker")) {
+              const lastPrice = parseFloat(payload.c);
+              const chg24     = parseFloat(payload.P);
+              if (Number.isFinite(lastPrice)) {
+                document.getElementById("price").textContent = lastPrice.toFixed(6);
+                document.getElementById("mark").textContent  = lastPrice.toFixed(6);
+              }
+              if (Number.isFinite(chg24)) {
+                document.getElementById("chg24").textContent = chg24.toFixed(2) + "%";
+                document.getElementById("chg24").className   = "value " + (chg24 >= 0 ? "green" : "red");
+              }
+            }
+
+            if (data.topic && data.topic.startsWith("kline.")) {
+              const k = Array.isArray(data.data) ? data.data[0] : data.data;
+              applyKlineUpdate(k);
+            if (stream && stream.includes("@kline_")) {
+              const k = payload.k;
+              const candle = {
+                time: new Date(k.t),
+                open: parseFloat(k.o),
+                high: parseFloat(k.h),
+                low: parseFloat(k.l),
+                close: parseFloat(k.c),
+                volume: parseFloat(k.v)
+              };
+
+              if (!klineData.length) {
+                klineData.push(candle);
+              } else {
+                const incomingTime = +candle.time;
+                const lastExistingTime = +klineData[klineData.length - 1].time;
+                if (incomingTime > lastExistingTime) {
+                  klineData.push(candle);
+                  if (klineData.length > 200) klineData.shift();
+                } else {
+                  klineData[klineData.length - 1] = candle;
+                }
+              }
+
+              recalcAndRenderFromKlines(candle.close);
+            }
+          } catch(e){
+            console.error("WS message error", e);
+@@ -973,12 +1100,10 @@
+        };
+
+        ws.onclose = () => {
+          clearWsTimers();
+          document.getElementById("status").textContent = "WebSocket отключён, реконнект через 5 секунд.";
+          document.getElementById("status").textContent = "WebSocket отключён, реконнект через 10 секунд.";
+          setTimeout(() => {
+            wsInstance = null;
+            initWebSocket();
+          }, 5000);
+          }, 10000);
+        };
+      } catch(e){
+        console.error("WS init error", e);
+@@ -996,25 +1121,20 @@
+          btn.classList.add("active");
+          document.getElementById("activeTfLabel").textContent = `Таймфрейм: ${TF_LABELS[currentInterval]}`;
+
+          document.getElementById("status").textContent = `Смена таймфрейма на ${TF_LABELS[currentInterval]}...`;
+
+          if (wsInstance) {
+            try { wsInstance.close(); } catch(e){}
+            wsInstance = null;
+          }
+          document.getElementById("status").textContent =
+            `Смена таймфрейма на ${TF_LABELS[currentInterval]}...`;
+
+          clearWsTimers();
+          priceChartInitialized = false;
+          await updateDashboardREST();
+          initWebSocket();
+        });
+      });
+    }
+
+    setupTfButtons();
+    updateDashboardREST();
+    setInterval(updateDashboardREST, 300000);
+    initWebSocket();
+  </script>
 </body>
 </html>
