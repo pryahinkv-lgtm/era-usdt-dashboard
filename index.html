@@ -101,7 +101,10 @@
   <div class="card">
     <h2>ERAUSDT Price + Candles</h2>
     <div id="price-chart"></div>
+    <div class="small" id="tf-signal-box" style="margin-top:6px;"></div>
+    <ul id="tf-signal-reasons"></ul>
   </div>
+
   <div class="card" id="signals">
     <h2>Signals (H1 + Nison)</h2>
     <div id="era-h1-signal-box" class="signal-box signal-neutral">H1: NEUTRAL</div>
@@ -109,7 +112,7 @@
     <hr>
     <div class="small">
       Свечные паттерны Нисона: Hammer, Shooting Star, Engulfing, Morning/Evening Star.<br>
-      Используются как подтверждение тренда RSI+MACD, уровней и объёма [web:53][web:49][web:56].
+      Используются как подтверждение тренда RSI+MACD, уровней и объёма, плюс Fibo‑уровни как зоны реакции цены [web:53][web:49][web:56][web:83].
     </div>
   </div>
 
@@ -229,32 +232,34 @@ function computeFiboLevels(klines) {
     { level: 0.0, price: maxHigh },
     { level: 0.236, price: maxHigh - diff * 0.236 },
     { level: 0.382, price: maxHigh - diff * 0.382 },
-    { level: 0.5, price: maxHigh - diff * 0.5 },
+    { level: 0.5,   price: maxHigh - diff * 0.5 },
     { level: 0.618, price: maxHigh - diff * 0.618 },
     { level: 0.786, price: maxHigh - diff * 0.786 },
-    { level: 1.0, price: minLow }
+    { level: 1.0,   price: minLow }
   ];
 }
 
+// приблизительное определение “поддержки/сопротивления” из Fibo для контекста сигнала [web:75][web:77][web:83]
+function computeFibSupportResistanceFromRange(fiboLevels) {
+  if (!fiboLevels || fiboLevels.length === 0) return { support: null, resistance: null };
+  const lvl382 = fiboLevels.find(f => Math.abs(f.level - 0.382) < 1e-6);
+  const lvl618 = fiboLevels.find(f => Math.abs(f.level - 0.618) < 1e-6);
+  const lvl50  = fiboLevels.find(f => Math.abs(f.level - 0.5) < 1e-6);
+  // В восходящем тренде откат к 0.382–0.618 — поддержка, 0.5 как нейтральный “pivot” [web:75][web:79][web:83]
+  return {
+    support: lvl618 ? lvl618.price : (lvl382 ? lvl382.price : null),
+    resistance: lvl382 ? lvl382.price : (lvl50 ? lvl50.price : null),
+    pivot: lvl50 ? lvl50.price : null
+  };
+}
+
 // =============== NISON CANDLE HELPERS ===============
-function isBullish(c) {
-  return c.close > c.open;
-}
-function isBearish(c) {
-  return c.close < c.open;
-}
-function bodySize(c) {
-  return Math.abs(c.close - c.open);
-}
-function totalRange(c) {
-  return c.high - c.low;
-}
-function upperShadow(c) {
-  return c.high - Math.max(c.open, c.close);
-}
-function lowerShadow(c) {
-  return Math.min(c.open, c.close) - c.low;
-}
+function isBullish(c) { return c.close > c.open; }
+function isBearish(c) { return c.close < c.open; }
+function bodySize(c) { return Math.abs(c.close - c.open); }
+function totalRange(c) { return c.high - c.low; }
+function upperShadow(c) { return c.high - Math.max(c.open, c.close); }
+function lowerShadow(c) { return Math.min(c.open, c.close) - c.low; }
 
 function isHammer(c) {
   const body = bodySize(c);
@@ -338,7 +343,7 @@ function isEveningStar(c1, c2, c3) {
   );
 }
 
-// Noise‑фильтр контекста
+// Noise‑фильтр контекста (EMA, RSI, MACD, объём, Fibo) [web:69][web:83][web:72][web:78]
 function computeNisonContextScore(candle, trendDirection) {
   let score = 0;
   const close = candle.close;
@@ -356,10 +361,10 @@ function computeNisonContextScore(candle, trendDirection) {
     if (close > ema200) score += 0.2;
   }
 
-  if (support !== undefined && close <= support * 1.01) {
+  if (support !== null && support !== undefined && close <= support * 1.01) {
     score += 0.2;
   }
-  if (resistance !== undefined && close >= resistance * 0.99) {
+  if (resistance !== null && resistance !== undefined && close >= resistance * 0.99) {
     score += 0.2;
   }
 
@@ -519,6 +524,70 @@ function updateSignalUIERA(classification) {
   });
 }
 
+// =============== CURRENT TF LONG/SHORT SIGNALS ===============
+// Простая логика: EMA‑фильтр тренда + MACD направление + RSI состояние + Fibo‑контекст [web:72][web:69][web:78][web:83]
+function computeTfSignals(klines, fiboContext) {
+  const res = { bias: "NEUTRAL", reasons: [] };
+  const n = klines.length;
+  if (n < 3) return res;
+
+  const last = klines[n - 1];
+  const rsi = last.rsi;
+  const macd = last.macd;
+  const macdSignal = last.macdSignal;
+  const ema = last.ema200;
+  const close = last.close;
+  const support = fiboContext.support;
+  const resistance = fiboContext.resistance;
+
+  const reasons = [];
+
+  const macdBull = macd !== null && macdSignal !== null && macd > macdSignal;
+  const macdBear = macd !== null && macdSignal !== null && macd < macdSignal;
+
+  const emaUp = ema && close > ema;
+  const emaDown = ema && close < ema;
+
+  const rsiBull = rsi && rsi > 40 && rsi < 70;
+  const rsiBear = rsi && rsi > 30 && rsi < 60 && rsi > 50;
+
+  const nearSupport = support && close <= support * 1.01;
+  const nearResistance = resistance && close >= resistance * 0.99;
+
+  if (emaUp) reasons.push("Price above EMA200 (trend up)");
+  if (emaDown) reasons.push("Price below EMA200 (trend down)");
+
+  if (macdBull) reasons.push("MACD > Signal (bullish)");
+  if (macdBear) reasons.push("MACD < Signal (bearish)");
+
+  if (rsiBull) reasons.push("RSI in bullish range");
+  if (rsiBear) reasons.push("RSI in bearish range");
+
+  if (nearSupport) reasons.push("Price near Fibo support zone");
+  if (nearResistance) reasons.push("Price near Fibo resistance zone");
+
+  let bias = "NEUTRAL";
+  if (emaUp && macdBull && rsiBull && nearSupport) bias = "LONG";
+  else if (emaDown && macdBear && rsiBear && nearResistance) bias = "SHORT";
+
+  res.bias = bias;
+  res.reasons = reasons;
+  return res;
+}
+
+function updateTfSignalUI(tfSignal) {
+  const box = document.getElementById("tf-signal-box");
+  const list = document.getElementById("tf-signal-reasons");
+  box.textContent = `Current TF (${currentInterval}m): ${tfSignal.bias}`;
+
+  list.innerHTML = "";
+  tfSignal.reasons.forEach(r => {
+    const li = document.createElement("li");
+    li.textContent = `[TF ${currentInterval}m] ` + r;
+    list.appendChild(li);
+  });
+}
+
 // =============== RENDER PLOTS ===============
 function renderPriceChart(klines) {
   const times = klines.map(c => new Date(c.time));
@@ -630,13 +699,14 @@ function renderFiboChart(klinesH1) {
     xaxis: { gridcolor: "#1f2937" },
     yaxis: { gridcolor: "#1f2937" }
   }, {responsive: true, displayModeBar: false});
+
+  return fibo;
 }
 
 // =============== MAIN PIPELINE ===============
 async function fetchAndRender() {
   try {
     const klines = await fetchKlines(currentInterval, 200);
-
     if (klines.length === 0) return;
 
     const closes = klines.map(c => c.close);
@@ -644,7 +714,6 @@ async function fetchAndRender() {
     const ema200 = calcEMA(closes, 200);
     const macdData = calcMACD(closes, 12, 26, 9);
 
-    // Добавляем индикаторы в свечи
     let volumeSum = 0;
     klines.forEach((c, i) => {
       c.rsi = rsis[i] || null;
@@ -654,13 +723,15 @@ async function fetchAndRender() {
       c.macdHist = macdData.hist[i] || null;
       volumeSum += c.volume;
       c.avgVolume = volumeSum / (i + 1);
-      c.supportLevel = null;    // сюда можно подставить твои уровни
-      c.resistanceLevel = null; // или рассчитать по swing high/low
+      // Fibo‑уровни для текущего ТФ можно добавить при желании,
+      // но основной контекст уровней мы считаем на H1 ниже.
+      c.supportLevel = null;
+      c.resistanceLevel = null;
     });
 
     renderPriceChart(klines);
 
-    // H1‑сигналы считаем на 60‑минутном таймфрейме (если текущий != 60, отдельно забираем)
+    // H1‑сигналы и Fibo‑уровни
     const h1Klines = currentInterval === 60 ? klines : await fetchKlines(60, 200);
     if (h1Klines.length > 0) {
       const h1Closes = h1Klines.map(c => c.close);
@@ -681,10 +752,21 @@ async function fetchAndRender() {
         c.resistanceLevel = null;
       });
 
+      const fiboLevels = renderFiboChart(h1Klines);
+      const fibContext = computeFibSupportResistanceFromRange(fiboLevels);
+
+      // заполняем Fibo‑support/resistance в последнюю H1‑свечу для контекста паттернов
+      const lastH1 = h1Klines[h1Klines.length - 1];
+      lastH1.supportLevel = fibContext.support;
+      lastH1.resistanceLevel = fibContext.resistance;
+
       const classification = classifyAdvancedERA(h1Klines);
       updateSignalUIERA(classification);
       renderRSIMACDCharts(h1Klines);
-      renderFiboChart(h1Klines);
+
+      // текущий TF‑сигнал (LONG/SHORT/NEUTRAL) по RSI/MACD/EMA + Fibo‑контекст
+      const tfSignal = computeTfSignals(klines, fibContext);
+      updateTfSignalUI(tfSignal);
     }
   } catch (e) {
     console.error("Error in fetchAndRender", e);
