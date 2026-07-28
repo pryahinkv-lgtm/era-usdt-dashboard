@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ERA/USDT Futures Dashboard</title>
+  <title>ERAUSDT Futures Dashboard</title>
   <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
   <style>
     :root{
       --bg:#0e1117;
       --panel:#161b22;
-      --panel-2:#11161d;
       --border:#262d38;
       --text:#e6edf3;
       --muted:#8b949e;
@@ -155,40 +154,34 @@
       color:#c9d1d9;
       border:1px solid #30363d;
     }
-    .green{color:var(--green)}
-    .red{color:var(--red)}
-    .yellow{color:var(--yellow)}
-    .muted{color:var(--muted)}
     .reasons{
       margin:8px 0 0;
       padding-left:18px;
     }
-    .reasons li{
-      margin-bottom:4px;
-    }
-    @media (max-width: 1180px){
+    .reasons li{margin-bottom:4px}
+    @media (max-width:1180px){
       .grid{grid-template-columns:repeat(3,1fr)}
       .charts{grid-template-columns:1fr}
     }
-    @media (max-width: 760px){
+    @media (max-width:760px){
       .grid{grid-template-columns:repeat(2,1fr)}
       .subgrid{grid-template-columns:1fr}
     }
-    @media (max-width: 520px){
+    @media (max-width:520px){
       .grid{grid-template-columns:1fr}
     }
   </style>
 </head>
 <body>
-  <h1>ERA/USDT — Bybit Futures Dashboard</h1>
+  <h1>ERAUSDT — Binance Futures Dashboard</h1>
   <div id="status">Загрузка...</div>
 
   <div class="toolbar">
     <div class="tf-group">
-      <button class="tf-btn" data-tf="5">5m</button>
-      <button class="tf-btn" data-tf="15">15m</button>
-      <button class="tf-btn active" data-tf="60">1h</button>
-      <button class="tf-btn" data-tf="240">4h</button>
+      <button class="tf-btn" data-tf="5m">5m</button>
+      <button class="tf-btn" data-tf="15m">15m</button>
+      <button class="tf-btn active" data-tf="1h">1h</button>
+      <button class="tf-btn" data-tf="4h">4h</button>
     </div>
     <div class="meta" id="activeTfLabel">Таймфрейм: 1h</div>
   </div>
@@ -196,9 +189,9 @@
   <div class="grid">
     <div class="card"><div class="label">Цена</div><div class="value" id="price">-</div></div>
     <div class="card"><div class="label">24ч изменение</div><div class="value" id="chg24">-</div></div>
-    <div class="card"><div class="label">Funding Rate</div><div class="value" id="funding">-</div></div>
-    <div class="card"><div class="label">Open Interest</div><div class="value" id="oi">-</div></div>
+    <div class="card"><div class="label">Mark Price</div><div class="value" id="mark">-</div></div>
     <div class="card"><div class="label">Объём последней свечи</div><div class="value" id="lastVol">-</div></div>
+    <div class="card"><div class="label">High / Low (24h)</div><div class="value" id="hiLo">-</div></div>
   </div>
 
   <div class="signal-box sig-neutral" id="signalBox">Расчёт сигнала...</div>
@@ -251,38 +244,49 @@
   </div>
 
   <div class="analysis">
-    <h3>Фундаментальный контекст ERA</h3>
+    <h3>Контекст ERAUSDT</h3>
     <p>
-      Caldera развивает modular rollup-инфраструктуру для Ethereum, а токен ERA используется в экосистемных сценариях вроде gas, governance и staking, поэтому для фьючерсного дашборда имеет смысл сочетать price action с funding/open interest, а не опираться только на один индикатор [web:3].
+      ERAUSDT — USDⓈ‑маржированный перпетуальный контракт на Binance Futures. В этом дашборде используются REST‑эндпоинты <code>/fapi/v1/klines</code> и <code>/fapi/v1/ticker/24hr</code>, а также WebSocket‑потоки кандлстиков и тикера через <code>wss://fstream.binance.com/stream</code>, согласно официальной документации USDS‑M фьючерсов [web:108][web:95][web:116][web:82].
     </p>
     <p>
-      Этот интерфейс строится на публичных market-данных Bybit, где доступны historical klines через `/v5/market/kline`, а live-свечи идут через `kline.{interval}.{symbol}` [web:28][web:2].
+      RSI(14) и MACD(12,26,9) на H1 комбинируются для фильтрации направленного риска: MACD задаёт направление тренда и импульс, а RSI даёт информацию о силе движения и возможной перекупленности/перепроданности, как рекомендуют современные стратегии RSI+MACD [web:70][web:83][web:84][web:92].
     </p>
   </div>
 
   <script>
     const SYMBOL = "ERAUSDT";
-    const REST = "https://api.bybit.com/v5/market";
-    const WS_PUBLIC_LINEAR = "wss://stream.bybit.com/v5/public/linear";
-    const TF_LABELS = { "5":"5m", "15":"15m", "60":"1h", "240":"4h" };
+    const REST_BASE = "https://fapi.binance.com";
+    const WS_BASE  = "wss://fstream.binance.com/stream";
 
-    let currentInterval = "60";
+    const TF_LABELS = {
+      "5m":"5m",
+      "15m":"15m",
+      "1h":"1h",
+      "4h":"4h"
+    };
+    const TF_KLINE = {
+      "5m":"5m",
+      "15m":"15m",
+      "1h":"1h",
+      "4h":"4h"
+    };
+
+    let currentInterval = "1h";
     let klineData = [];
     let wsInstance = null;
-    let pingTimer = null;
     let priceChartInitialized = false;
 
     async function fetchTicker(){
-      const res = await fetch(`${REST}/tickers?category=linear&symbol=${SYMBOL}`);
+      const res = await fetch(`${REST_BASE}/fapi/v1/ticker/24hr?symbol=${SYMBOL}`);
       const j = await res.json();
-      return j.result.list[0];
+      return j;
     }
 
     async function fetchKlines(interval = currentInterval, limit = 200){
-      const res = await fetch(`${REST}/kline?category=linear&symbol=${SYMBOL}&interval=${interval}&limit=${limit}`);
+      const res = await fetch(`${REST_BASE}/fapi/v1/klines?symbol=${SYMBOL}&interval=${TF_KLINE[interval]}&limit=${limit}`);
       const j = await res.json();
-      return j.result.list.reverse().map(k => ({
-        time: new Date(parseInt(k[0])),
+      return j.map(k => ({
+        time: new Date(k[0]),
         open: parseFloat(k[1]),
         high: parseFloat(k[2]),
         low: parseFloat(k[3]),
@@ -430,105 +434,267 @@
       return { long:false, short:false, text:`цена у нейтрального Fib ${nearest.level}` };
     }
 
-    function classifyAdvanced(kl, rsis, macdObj, fiboLevels, tf){
-      const closes = kl.map(k => k.close);
-      const volumes = kl.map(k => k.volume);
-      const last = closes[closes.length - 1];
-      const prev = closes[closes.length - 2] ?? last;
+    function should_long_ERAUSDT_1h(ctx){
+      const rsi    = ctx.rsiLast;
+      const macd   = ctx.macdLast;
+      const signal = ctx.signalLast;
+      const hist   = ctx.histLast;
+      const price  = ctx.closeLast;
+      const sma20  = ctx.sma20Last;
+      const sma50  = ctx.sma50Last;
 
-      const rsiLast = rsis[rsis.length - 1];
-      const macdLast = macdObj.macd[macdObj.macd.length - 1];
-      const signalLast = macdObj.signal[macdObj.signal.length - 1];
-      const histLast = macdObj.hist[macdObj.hist.length - 1];
+      const rsi_ok =
+        rsi != null &&
+        rsi > 50 &&
+        rsi < 70;
 
-      const sma20 = sma(closes, 20);
-      const sma50 = sma(closes, 50);
-      const ema9 = ema(closes, 9);
-      const ema21 = ema(closes, 21);
-      const atr14 = calcATR(kl, 14);
-      const avgVol20 = sma(volumes, 20);
-      const candle = detectCandleSignal(kl);
-      const fibBias = nearestFiboBias(last, fiboLevels);
+      const macd_bull =
+        macd != null && signal != null && hist != null &&
+        macd > signal &&
+        hist > 0;
 
-      let longScore = 0;
-      let shortScore = 0;
+      const trend_ok =
+        sma20 == null || sma50 == null
+          ? true
+          : (price > sma20 && sma20 >= sma50);
+
+      const ok = rsi_ok && macd_bull && trend_ok;
+
       const reasons = [];
+      if (!rsi_ok)    reasons.push("RSI ERAUSDT на H1 не в бычьей зоне 50–70");
+      if (!macd_bull) reasons.push("MACD ERAUSDT на H1 не даёт устойчивый бычий сигнал");
+      if (!trend_ok)  reasons.push("Цена/SMA для ERAUSDT не подтверждают восходящий тренд");
+
+      return {
+        shouldLong: ok,
+        reasons: ok
+          ? ["ERAUSDT H1: RSI 50–70, MACD > Signal, hist > 0, тренд восходящий"]
+          : reasons
+      };
+    }
+
+    function should_short_ERAUSDT_1h(ctx){
+      const rsi    = ctx.rsiLast;
+      const macd   = ctx.macdLast;
+      const signal = ctx.signalLast;
+      const hist   = ctx.histLast;
+      const price  = ctx.closeLast;
+      const sma20  = ctx.sma20Last;
+      const sma50  = ctx.sma50Last;
+
+      const rsi_overbought =
+        rsi != null && rsi > 70;
+
+      const rsi_bear_bias =
+        rsi != null && rsi < 50;
+
+      const rsi_ok = rsi_overbought || rsi_bear_bias;
+
+      const macd_bear =
+        macd != null && signal != null && hist != null &&
+        macd < signal &&
+        hist < 0;
+
+      const trend_ok =
+        sma20 == null || sma50 == null
+          ? true
+          : (price < sma20 && sma20 <= sma50);
+
+      const ok = rsi_ok && macd_bear && trend_ok;
+
+      const reasons = [];
+      if (!rsi_ok)    reasons.push("RSI ERAUSDT на H1 не даёт медвежьего сигнала (нет перекупленности, rsi >=50)");
+      if (!macd_bear) reasons.push("MACD ERAUSDT на H1 не подтверждает медвежий импульс");
+      if (!trend_ok)  reasons.push("Цена/SMA для ERAUSDT не подтверждают нисходящий тренд");
+
+      return {
+        shouldShort: ok,
+        reasons: ok
+          ? ["ERAUSDT H1: RSI перекуплен или ниже 50, MACD < Signal, hist < 0, тренд нисходящий"]
+          : reasons
+      };
+    }
+
+    function classifyAdvanced(kl, rsis, macdObj, fiboLevels, tf){
+      const closes  = kl.map(k => k.close);
+      const volumes = kl.map(k => k.volume);
+      const last    = closes[closes.length - 1];
+      const prev    = closes[closes.length - 2] ?? last;
+
+      const rsiLast    = rsis[rsis.length - 1];
+      const macdLast   = macdObj.macd[macdObj.macd.length - 1];
+      const signalLast = macdObj.signal[macdObj.signal.length - 1];
+      const histLast   = macdObj.hist[macdObj.hist.length - 1];
+
+      const sma20Arr = sma(closes, 20);
+      const sma50Arr = sma(closes, 50);
+      const ema9Arr  = ema(closes, 9);
+      const ema21Arr = ema(closes, 21);
+      const atr14Arr = calcATR(kl, 14);
+      const avgVol20 = sma(volumes, 20);
+      const candle   = detectCandleSignal(kl);
+      const fibBias  = nearestFiboBias(last, fiboLevels);
+
+      const sma20Last  = sma20Arr[sma20Arr.length - 1];
+      const sma50Last  = sma50Arr[sma50Arr.length - 1];
+      const ema9Last   = ema9Arr[ema9Arr.length - 1];
+      const ema21Last  = ema21Arr[ema21Arr.length - 1];
+      const avgVolLast = avgVol20[avgVol20.length - 1];
+      const atrNow     = atr14Arr[atr14Arr.length - 1] ?? null;
+
+      let longScore  = 0;
+      let shortScore = 0;
+      const reasons  = [];
 
       if (rsiLast != null) {
-        if (rsiLast < 32) { longScore += 2; reasons.push("RSI в перепроданности"); }
-        else if (rsiLast > 68) { shortScore += 2; reasons.push("RSI в перекупленности"); }
-        else if (rsiLast > 50) { longScore += 1; reasons.push("RSI выше 50"); }
-        else { shortScore += 1; reasons.push("RSI ниже 50"); }
+        if (rsiLast < 32) {
+          longScore += 2;
+          reasons.push("RSI ERAUSDT в перепроданности");
+        } else if (rsiLast > 68) {
+          shortScore += 2;
+          reasons.push("RSI ERAUSDT в перекупленности");
+        } else if (rsiLast > 50) {
+          longScore += 1;
+          reasons.push("RSI ERAUSDT выше 50");
+        } else {
+          shortScore += 1;
+          reasons.push("RSI ERAUSDT ниже 50");
+        }
       }
 
-      if (macdLast > signalLast && histLast > 0) { longScore += 2; reasons.push("MACD bullish"); }
-      if (macdLast < signalLast && histLast < 0) { shortScore += 2; reasons.push("MACD bearish"); }
-
-      const sma20Last = sma20[sma20.length - 1];
-      const sma50Last = sma50[sma50.length - 1];
-      const ema9Last = ema9[ema9.length - 1];
-      const ema21Last = ema21[ema21.length - 1];
-      const avgVolLast = avgVol20[avgVol20.length - 1];
+      if (macdLast > signalLast && histLast > 0) {
+        longScore += 2;
+        reasons.push("MACD ERAUSDT bullish");
+      }
+      if (macdLast < signalLast && histLast < 0) {
+        shortScore += 2;
+        reasons.push("MACD ERAUSDT bearish");
+      }
 
       if (sma20Last != null) {
-        if (last > sma20Last) { longScore += 1; reasons.push("Цена выше SMA20"); }
-        else { shortScore += 1; reasons.push("Цена ниже SMA20"); }
+        if (last > sma20Last) {
+          longScore += 1;
+          reasons.push("ERAUSDT цена выше SMA20");
+        } else {
+          shortScore += 1;
+          reasons.push("ERAUSDT цена ниже SMA20");
+        }
       }
 
       if (sma20Last != null && sma50Last != null) {
-        if (sma20Last > sma50Last) { longScore += 1; reasons.push("SMA20 выше SMA50"); }
-        else { shortScore += 1; reasons.push("SMA20 ниже SMA50"); }
+        if (sma20Last > sma50Last) {
+          longScore += 1;
+          reasons.push("SMA20 ERAUSDT выше SMA50");
+        } else {
+          shortScore += 1;
+          reasons.push("SMA20 ERAUSDT ниже SMA50");
+        }
       }
 
       if (ema9Last != null && ema21Last != null) {
-        if (ema9Last > ema21Last) { longScore += 1; reasons.push("EMA9 выше EMA21"); }
-        else { shortScore += 1; reasons.push("EMA9 ниже EMA21"); }
+        if (ema9Last > ema21Last) {
+          longScore += 1;
+          reasons.push("EMA9 ERAUSDT выше EMA21");
+        } else {
+          shortScore += 1;
+          reasons.push("EMA9 ERAUSDT ниже EMA21");
+        }
       }
 
-      if (avgVolLast != null && avgVolLast > 0 && volumes[volumes.length - 1] > avgVolLast * 1.2) {
-        if (last > prev) { longScore += 1; reasons.push("Рост на повышенном объёме"); }
-        if (last < prev) { shortScore += 1; reasons.push("Снижение на повышенном объёме"); }
+      if (avgVolLast != null && avgVolLast > 0 &&
+          volumes[volumes.length - 1] > avgVolLast * 1.2) {
+        if (last > prev) {
+          longScore += 1;
+          reasons.push("ERAUSDT рост на повышенном объёме");
+        }
+        if (last < prev) {
+          shortScore += 1;
+          reasons.push("ERAUSDT снижение на повышенном объёме");
+        }
       }
 
-      if (candle.bull) { longScore += 2; reasons.push(`Свечной паттерн: ${candle.name}`); }
-      if (candle.bear) { shortScore += 2; reasons.push(`Свечной паттерн: ${candle.name}`); }
+      if (candle.bull) {
+        longScore += 2;
+        reasons.push(`Свечной паттерн ERAUSDT: ${candle.name}`);
+      }
+      if (candle.bear) {
+        shortScore += 2;
+        reasons.push(`Свечной паттерн ERAUSDT: ${candle.name}`);
+      }
 
-      if (fibBias.long) { longScore += 1; reasons.push(fibBias.text); }
-      if (fibBias.short) { shortScore += 1; reasons.push(fibBias.text); }
+      if (fibBias.long)  {
+        longScore += 1;
+        reasons.push(fibBias.text);
+      }
+      if (fibBias.short) {
+        shortScore += 1;
+        reasons.push(fibBias.text);
+      }
 
       let setupTf = "15m";
-      if (tf === "60") setupTf = "5m–15m";
-      if (tf === "240") setupTf = "15m–1h";
-      if (tf === "15") setupTf = "5m";
-      if (tf === "5") setupTf = "5m";
+      if (tf === "1h")  setupTf = "5m–15m";
+      if (tf === "4h")  setupTf = "15m–1h";
+      if (tf === "15m") setupTf = "5m";
+      if (tf === "5m")  setupTf = "5m";
 
-      const atrNow = atr14[atr14.length - 1] ?? null;
       const entry = last;
-      let sl = null, tp1 = null, tp2 = null;
-      let label = "NEUTRAL", cls = "sig-neutral";
+      let sl  = null;
+      let tp1 = null;
+      let tp2 = null;
+      let label = "NEUTRAL";
+      let cls   = "sig-neutral";
 
-      if (longScore - shortScore >= 6) { label = "STRONG LONG"; cls = "sig-long"; }
-      else if (longScore - shortScore >= 3) { label = "LONG"; cls = "sig-long"; }
+      if (longScore - shortScore >= 6)      { label = "STRONG LONG";  cls = "sig-long"; }
+      else if (longScore - shortScore >= 3) { label = "LONG";         cls = "sig-long"; }
       else if (shortScore - longScore >= 6) { label = "STRONG SHORT"; cls = "sig-short"; }
-      else if (shortScore - longScore >= 3) { label = "SHORT"; cls = "sig-short"; }
+      else if (shortScore - longScore >= 3) { label = "SHORT";        cls = "sig-short"; }
 
       if (atrNow != null) {
         if (label.includes("LONG")) {
-          sl = entry - atrNow * 1.2;
+          sl  = entry - atrNow * 1.2;
           tp1 = entry + atrNow * 1.5;
           tp2 = entry + atrNow * 2.5;
         } else if (label.includes("SHORT")) {
-          sl = entry + atrNow * 1.2;
+          sl  = entry + atrNow * 1.2;
           tp1 = entry - atrNow * 1.5;
           tp2 = entry - atrNow * 2.5;
         }
+      }
+
+      const ctx = {
+        rsiLast,
+        macdLast,
+        signalLast,
+        histLast,
+        closeLast: entry,
+        sma20Last,
+        sma50Last
+      };
+
+      const longDecision  = should_long_ERAUSDT_1h(ctx);
+      const shortDecision = should_short_ERAUSDT_1h(ctx);
+
+      let h1Bias = "NEUTRAL";
+      const h1Reasons = [];
+
+      if (longDecision.shouldLong && !shortDecision.shouldShort) {
+        h1Bias = "LONG";
+        h1Reasons.push(...longDecision.reasons);
+      } else if (shortDecision.shouldShort && !longDecision.shouldLong) {
+        h1Bias = "SHORT";
+        h1Reasons.push(...shortDecision.reasons);
+      } else {
+        h1Bias = "NEUTRAL";
+        h1Reasons.push("RSI+MACD ERAUSDT на H1 не дают однозначного long/short");
+        h1Reasons.push(...longDecision.reasons, ...shortDecision.reasons);
       }
 
       return {
         label, cls, longScore, shortScore, reasons,
         entry, sl, tp1, tp2, atrNow, setupTf,
         rsiLast, macdLast, signalLast, histLast,
-        sma20Last, sma50Last, ema9Last, ema21Last
+        sma20Last, sma50Last, ema9Last, ema21Last,
+        h1Bias, h1Reasons
       };
     }
 
@@ -771,14 +937,14 @@
         SMA50: <b>${fmt(sig.sma50Last)}</b>,
         EMA9: <b>${fmt(sig.ema9Last)}</b>,
         EMA21: <b>${fmt(sig.ema21Last)}</b>,
-        ATR14: <b>${sig.atrNow != null ? fmt(sig.atrNow) : "-"}</b>
+        ATR14: <b>${sig.atrNow != null ? fmt(sig.atrNow) : "-"}</b><br>
+        H1 bias ERAUSDT (RSI+MACD): <b>${sig.h1Bias}</b>
       `;
 
       document.getElementById("signalDetails").innerHTML = `
         Score Long/Short: <b>${sig.longScore}/${sig.shortScore}</b><br>
-        Интерпретация: текущий таймфрейм <b>${TF_LABELS[currentInterval]}</b> задаёт рабочий контекст,
-        а рекомендуемый таймфрейм входа — <b>${sig.setupTf}</b>. 
-        Entry/SL/TP рассчитываются от текущей цены и ATR, поэтому значения адаптируются к волатильности.
+        H1 bias используется как фильтр: входы на 5m–15m допускаются, когда bias LONG/SHORT согласован
+        с консолидированным сигналом дашборда.
       `;
 
       const list = document.getElementById("reasonsList");
@@ -788,15 +954,20 @@
         li.textContent = r;
         list.appendChild(li);
       });
+      sig.h1Reasons.forEach(r => {
+        const li = document.createElement("li");
+        li.textContent = "[ERA H1] " + r;
+        list.appendChild(li);
+      });
     }
 
     function recalcAndRenderFromKlines(lastPriceOverride = null){
       if (!klineData.length) return;
 
       const closes = klineData.map(k => k.close);
-      const highs = klineData.map(k => k.high);
-      const lows = klineData.map(k => k.low);
-      const rsis = calcRSI(closes, 14);
+      const highs  = klineData.map(k => k.high);
+      const lows   = klineData.map(k => k.low);
+      const rsis   = calcRSI(closes, 14);
       const macdObj = calcMACD(closes);
       const fiboLevels = calcFibo(highs, lows);
       const lastPrice = lastPriceOverride ?? closes[closes.length - 1];
@@ -819,7 +990,7 @@
 
     async function updateDashboardREST(){
       try{
-        document.getElementById("status").textContent = `Загрузка данных Bybit (${TF_LABELS[currentInterval]})...`;
+        document.getElementById("status").textContent = `Загрузка данных Binance (${TF_LABELS[currentInterval]})...`;
 
         const [ticker, kl] = await Promise.all([
           fetchTicker(),
@@ -829,16 +1000,19 @@
         klineData = kl;
 
         const lastPrice = parseFloat(ticker.lastPrice);
-        const chg24 = parseFloat(ticker.price24hPcnt);
-        const funding = parseFloat(ticker.fundingRate);
-        const oi = parseFloat(ticker.openInterest);
+        const chg24 = parseFloat(ticker.priceChangePercent);
+        const high  = parseFloat(ticker.highPrice);
+        const low   = parseFloat(ticker.lowPrice);
+        const mark  = parseFloat(ticker.lastPrice); // для простоты mark ~ last
 
         document.getElementById("price").textContent = Number.isFinite(lastPrice) ? lastPrice.toFixed(6) : "-";
-        document.getElementById("chg24").textContent = Number.isFinite(chg24) ? (chg24 * 100).toFixed(2) + "%" : "-";
+        document.getElementById("chg24").textContent = Number.isFinite(chg24) ? chg24.toFixed(2) + "%" : "-";
         document.getElementById("chg24").className = "value " + (chg24 >= 0 ? "green" : "red");
-        document.getElementById("funding").textContent = Number.isFinite(funding) ? (funding * 100).toFixed(4) + "%" : "-";
-        document.getElementById("funding").className = "value " + (funding >= 0 ? "yellow" : "blue");
-        document.getElementById("oi").textContent = Number.isFinite(oi) ? oi.toFixed(0) : "-";
+        document.getElementById("mark").textContent  = Number.isFinite(mark) ? mark.toFixed(6) : "-";
+        document.getElementById("hiLo").textContent  =
+          (Number.isFinite(high) && Number.isFinite(low))
+            ? `${high.toFixed(6)} / ${low.toFixed(6)}`
+            : "-";
 
         recalcAndRenderFromKlines(lastPrice);
         document.getElementById("status").textContent = `Обновлено (REST): ${new Date().toLocaleString()}`;
@@ -848,119 +1022,72 @@
       }
     }
 
-    function applyTickerUpdate(t){
-      if (!t) return;
-
-      if (t.lastPrice != null) {
-        const lastPrice = parseFloat(t.lastPrice);
-        if (Number.isFinite(lastPrice)) {
-          document.getElementById("price").textContent = lastPrice.toFixed(6);
-        }
-      }
-
-      if (t.price24hPcnt != null) {
-        const chg24 = parseFloat(t.price24hPcnt);
-        if (Number.isFinite(chg24)) {
-          document.getElementById("chg24").textContent = (chg24 * 100).toFixed(2) + "%";
-          document.getElementById("chg24").className = "value " + (chg24 >= 0 ? "green" : "red");
-        }
-      }
-
-      if (t.fundingRate != null) {
-        const funding = parseFloat(t.fundingRate);
-        if (Number.isFinite(funding)) {
-          document.getElementById("funding").textContent = (funding * 100).toFixed(4) + "%";
-        }
-      }
-
-      if (t.openInterest != null) {
-        const oi = parseFloat(t.openInterest);
-        if (Number.isFinite(oi)) {
-          document.getElementById("oi").textContent = oi.toFixed(0);
-        }
-      }
-    }
-
-    function applyKlineUpdate(k){
-      if (!k) return;
-      const startRaw = k.start ?? k.startTime;
-      if (startRaw == null) return;
-
-      const candle = {
-        time: new Date(parseInt(startRaw)),
-        open: parseFloat(k.open),
-        high: parseFloat(k.high),
-        low: parseFloat(k.low),
-        close: parseFloat(k.close),
-        volume: parseFloat(k.volume)
-      };
-
-      if (!klineData.length) {
-        klineData.push(candle);
-        recalcAndRenderFromKlines(candle.close);
-        return;
-      }
-
-      const incomingTime = +candle.time;
-      const lastExistingTime = +klineData[klineData.length - 1].time;
-
-      if (k.confirm === true) {
-        if (incomingTime > lastExistingTime) {
-          klineData.push(candle);
-          if (klineData.length > 200) klineData.shift();
-        } else {
-          klineData[klineData.length - 1] = candle;
-        }
-      } else {
-        if (incomingTime >= lastExistingTime) {
-          klineData[klineData.length - 1] = candle;
-        }
-      }
-
-      recalcAndRenderFromKlines(candle.close);
-    }
-
-    function clearWsTimers(){
-      if (pingTimer) {
-        clearInterval(pingTimer);
-        pingTimer = null;
+    function clearWs(){
+      if (wsInstance) {
+        try { wsInstance.close(); } catch(e){}
+        wsInstance = null;
       }
     }
 
     function initWebSocket(){
       try{
-        if (wsInstance && wsInstance.readyState === WebSocket.OPEN) return;
-
-        const ws = new WebSocket(WS_PUBLIC_LINEAR);
+        clearWs();
+        const streams = [
+          `${SYMBOL.toLowerCase()}@ticker`,
+          `${SYMBOL.toLowerCase()}@kline_${TF_KLINE[currentInterval]}`
+        ].join("/");
+        const ws = new WebSocket(`${WS_BASE}?streams=${streams}`);
         wsInstance = ws;
 
         ws.onopen = () => {
-          ws.send(JSON.stringify({ op:"subscribe", args:[`tickers.${SYMBOL}`] }));
-          ws.send(JSON.stringify({ op:"subscribe", args:[`kline.${currentInterval}.${SYMBOL}`] }));
-
-          clearWsTimers();
-          pingTimer = setInterval(() => {
-            if (ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({ op:"ping" }));
-            }
-          }, 20000);
-
           document.getElementById("status").textContent =
-            `WebSocket подключён: tickers.${SYMBOL}, kline.${currentInterval}.${SYMBOL}`;
+            `WebSocket подключён: ${streams}`;
         };
 
         ws.onmessage = (ev) => {
           try{
             const data = JSON.parse(ev.data);
+            const stream = data.stream;
+            const payload = data.data;
 
-            if (data.topic && data.topic.startsWith("tickers.")) {
-              const t = Array.isArray(data.data) ? data.data[0] : data.data;
-              applyTickerUpdate(t);
+            if (stream && stream.includes("@ticker")) {
+              const lastPrice = parseFloat(payload.c);
+              const chg24     = parseFloat(payload.P);
+              if (Number.isFinite(lastPrice)) {
+                document.getElementById("price").textContent = lastPrice.toFixed(6);
+                document.getElementById("mark").textContent  = lastPrice.toFixed(6);
+              }
+              if (Number.isFinite(chg24)) {
+                document.getElementById("chg24").textContent = chg24.toFixed(2) + "%";
+                document.getElementById("chg24").className   = "value " + (chg24 >= 0 ? "green" : "red");
+              }
             }
 
-            if (data.topic && data.topic.startsWith("kline.")) {
-              const k = Array.isArray(data.data) ? data.data[0] : data.data;
-              applyKlineUpdate(k);
+            if (stream && stream.includes("@kline_")) {
+              const k = payload.k;
+              const candle = {
+                time: new Date(k.t),
+                open: parseFloat(k.o),
+                high: parseFloat(k.h),
+                low: parseFloat(k.l),
+                close: parseFloat(k.c),
+                volume: parseFloat(k.v)
+              };
+
+              if (!klineData.length) {
+                klineData.push(candle);
+              } else {
+                const incomingTime = +candle.time;
+                const lastExistingTime = +klineData[klineData.length - 1].time;
+                if (incomingTime > lastExistingTime) {
+                  klineData.push(candle);
+                  if (klineData.length > 200) klineData.shift();
+                } else {
+                  klineData[klineData.length - 1] = candle;
+                }
+              }
+
+              recalcAndRenderFromKlines(candle.close);
             }
           } catch(e){
             console.error("WS message error", e);
@@ -973,12 +1100,10 @@
         };
 
         ws.onclose = () => {
-          clearWsTimers();
-          document.getElementById("status").textContent = "WebSocket отключён, реконнект через 5 секунд.";
+          document.getElementById("status").textContent = "WebSocket отключён, реконнект через 10 секунд.";
           setTimeout(() => {
-            wsInstance = null;
             initWebSocket();
-          }, 5000);
+          }, 10000);
         };
       } catch(e){
         console.error("WS init error", e);
@@ -996,14 +1121,9 @@
           btn.classList.add("active");
           document.getElementById("activeTfLabel").textContent = `Таймфрейм: ${TF_LABELS[currentInterval]}`;
 
-          document.getElementById("status").textContent = `Смена таймфрейма на ${TF_LABELS[currentInterval]}...`;
+          document.getElementById("status").textContent =
+            `Смена таймфрейма на ${TF_LABELS[currentInterval]}...`;
 
-          if (wsInstance) {
-            try { wsInstance.close(); } catch(e){}
-            wsInstance = null;
-          }
-
-          clearWsTimers();
           priceChartInitialized = false;
           await updateDashboardREST();
           initWebSocket();
