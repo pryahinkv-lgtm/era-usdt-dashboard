@@ -1,1140 +1,699 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ERAUSDT Futures Dashboard</title>
-  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <meta charset="UTF-8">
+  <title>ERAUSDT Futures Dashboard (Bybit + Nison)</title>
+  <script src="https://cdn.plot.ly/plotly-3.1.0.min.js"></script> <!-- Plotly [web:54] -->
   <style>
-    :root{
-      --bg:#0e1117;
-      --panel:#161b22;
-      --border:#262d38;
-      --text:#e6edf3;
-      --muted:#8b949e;
-      --blue:#58a6ff;
-      --green:#3fb950;
-      --red:#f85149;
-      --yellow:#d29922;
-      --purple:#bc8cff;
+    body {
+      background: #0e1117;
+      color: #e6e6e6;
+      font-family: Segoe UI, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
     }
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      background:var(--bg);
-      color:var(--text);
-      font-family:Segoe UI,Arial,sans-serif;
-      padding:16px;
+    header {
+      padding: 10px 20px;
+      background: #111827;
+      border-bottom: 1px solid #1f2937;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
-    h1{
-      font-size:22px;
-      margin:0 0 6px;
+    header h1 {
+      font-size: 18px;
+      margin: 0;
     }
-    #status{
-      font-size:12px;
-      color:var(--muted);
-      margin-bottom:10px;
+    .tf-buttons button {
+      margin-right: 6px;
+      padding: 4px 10px;
+      background: #1f2937;
+      border: 1px solid #374151;
+      color: #e5e7eb;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 12px;
     }
-    .toolbar{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:12px;
-      flex-wrap:wrap;
-      margin:12px 0 14px;
+    .tf-buttons button.active {
+      background: #2563eb;
+      border-color: #3b82f6;
     }
-    .tf-group{
-      display:flex;
-      gap:8px;
-      flex-wrap:wrap;
+    .layout {
+      display: grid;
+      grid-template-columns: 3fr 1.5fr;
+      grid-template-rows: auto auto;
+      gap: 10px;
+      padding: 10px;
     }
-    .tf-btn{
-      background:var(--panel);
-      border:1px solid #30363d;
-      color:#c9d1d9;
-      padding:8px 12px;
-      border-radius:8px;
-      cursor:pointer;
-      font-weight:600;
-      transition:.2s ease;
+    .card {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      padding: 8px;
     }
-    .tf-btn:hover{
-      border-color:var(--blue);
-      color:#fff;
+    .card h2 {
+      font-size: 14px;
+      margin: 0 0 6px 0;
     }
-    .tf-btn.active{
-      background:#1f6feb;
-      border-color:#1f6feb;
-      color:#fff;
+    #price-chart, #rsi-chart, #macd-chart, #fibo-chart {
+      width: 100%;
+      height: 260px;
     }
-    .meta{
-      font-size:12px;
-      color:var(--muted);
+    #signals {
+      font-size: 13px;
     }
-    .grid{
-      display:grid;
-      grid-template-columns:repeat(5,1fr);
-      gap:10px;
-      margin-bottom:14px;
+    .signal-box {
+      padding: 6px 8px;
+      border-radius: 4px;
+      margin-bottom: 6px;
     }
-    .card{
-      background:var(--panel);
-      border:1px solid var(--border);
-      border-radius:10px;
-      padding:10px 14px;
-      min-height:74px;
+    .signal-long { background: #14532d; color: #bbf7d0; }
+    .signal-short { background: #7f1d1d; color: #fecaca; }
+    .signal-neutral { background: #374151; color: #e5e7eb; }
+    ul {
+      margin: 4px 0 0 16px;
+      padding: 0;
     }
-    .card .label{
-      font-size:11px;
-      color:var(--muted);
-      text-transform:uppercase;
-      letter-spacing:.04em;
+    li {
+      margin-bottom: 3px;
     }
-    .card .value{
-      font-size:18px;
-      font-weight:700;
-      margin-top:6px;
-    }
-    .signal-box{
-      padding:14px;
-      border-radius:10px;
-      font-size:16px;
-      font-weight:800;
-      text-align:center;
-      margin-bottom:14px;
-      border:1px solid var(--border);
-    }
-    .sig-long{background:#0f3d24;color:var(--green);border-color:var(--green)}
-    .sig-short{background:#3d0f14;color:var(--red);border-color:var(--red)}
-    .sig-neutral{background:#26241a;color:var(--yellow);border-color:var(--yellow)}
-    .charts{
-      display:grid;
-      grid-template-columns:2fr 1fr;
-      gap:10px;
-    }
-    .chart-box,.analysis{
-      background:var(--panel);
-      border:1px solid var(--border);
-      border-radius:10px;
-      padding:10px;
-    }
-    .analysis{
-      margin-top:14px;
-      font-size:13px;
-      line-height:1.65;
-    }
-    .analysis h3{
-      margin:0 0 10px;
-      color:var(--blue);
-      font-size:15px;
-    }
-    table{
-      width:100%;
-      font-size:12px;
-      border-collapse:collapse;
-    }
-    td,th{
-      padding:6px 6px;
-      border-bottom:1px solid var(--border);
-      text-align:left;
-    }
-    .subgrid{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:10px;
-      margin-top:10px;
-    }
-    .pill{
-      display:inline-block;
-      padding:4px 8px;
-      border-radius:999px;
-      font-size:11px;
-      font-weight:700;
-      background:#1b2330;
-      color:#c9d1d9;
-      border:1px solid #30363d;
-    }
-    .reasons{
-      margin:8px 0 0;
-      padding-left:18px;
-    }
-    .reasons li{margin-bottom:4px}
-    @media (max-width:1180px){
-      .grid{grid-template-columns:repeat(3,1fr)}
-      .charts{grid-template-columns:1fr}
-    }
-    @media (max-width:760px){
-      .grid{grid-template-columns:repeat(2,1fr)}
-      .subgrid{grid-template-columns:1fr}
-    }
-    @media (max-width:520px){
-      .grid{grid-template-columns:1fr}
+    .small {
+      font-size: 11px;
+      color: #9ca3af;
     }
   </style>
 </head>
 <body>
-  <h1>ERAUSDT — Binance Futures Dashboard</h1>
-  <div id="status">Загрузка...</div>
-
-  <div class="toolbar">
-    <div class="tf-group">
-      <button class="tf-btn" data-tf="5m">5m</button>
-      <button class="tf-btn" data-tf="15m">15m</button>
-      <button class="tf-btn active" data-tf="1h">1h</button>
-      <button class="tf-btn" data-tf="4h">4h</button>
-    </div>
-    <div class="meta" id="activeTfLabel">Таймфрейм: 1h</div>
+<header>
+  <div>
+    <h1>ERAUSDT Futures Dashboard (Bybit + Nison)</h1>
+    <div class="small">Bybit REST v5 kline, Plotly, Japanese Candlesticks</div>
   </div>
-
-  <div class="grid">
-    <div class="card"><div class="label">Цена</div><div class="value" id="price">-</div></div>
-    <div class="card"><div class="label">24ч изменение</div><div class="value" id="chg24">-</div></div>
-    <div class="card"><div class="label">Mark Price</div><div class="value" id="mark">-</div></div>
-    <div class="card"><div class="label">Объём последней свечи</div><div class="value" id="lastVol">-</div></div>
-    <div class="card"><div class="label">High / Low (24h)</div><div class="value" id="hiLo">-</div></div>
+  <div class="tf-buttons">
+    <button data-tf="5"  class="active">5m</button>
+    <button data-tf="15">15m</button>
+    <button data-tf="60">1h</button>
+    <button data-tf="240">4h</button>
   </div>
+</header>
 
-  <div class="signal-box sig-neutral" id="signalBox">Расчёт сигнала...</div>
-
-  <div class="charts">
-    <div class="chart-box">
-      <div id="priceChart" style="height:430px;"></div>
-    </div>
-    <div class="chart-box">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <b>Уровни Fibonacci</b>
-        <span class="pill" id="fibHint">последний swing</span>
-      </div>
-      <table id="fiboTbl"><tbody></tbody></table>
-      <div class="subgrid" style="margin-top:12px;">
-        <div class="card" style="padding:10px;">
-          <div class="label">Entry</div>
-          <div class="value" id="entryVal">-</div>
-        </div>
-        <div class="card" style="padding:10px;">
-          <div class="label">Stop Loss</div>
-          <div class="value" id="slVal">-</div>
-        </div>
-        <div class="card" style="padding:10px;">
-          <div class="label">Take Profit 1</div>
-          <div class="value" id="tp1Val">-</div>
-        </div>
-        <div class="card" style="padding:10px;">
-          <div class="label">Take Profit 2</div>
-          <div class="value" id="tp2Val">-</div>
-        </div>
-      </div>
+<div class="layout">
+  <div class="card">
+    <h2>ERAUSDT Price + Candles</h2>
+    <div id="price-chart"></div>
+  </div>
+  <div class="card" id="signals">
+    <h2>Signals (H1 + Nison)</h2>
+    <div id="era-h1-signal-box" class="signal-box signal-neutral">H1: NEUTRAL</div>
+    <ul id="era-h1-reasons"></ul>
+    <hr>
+    <div class="small">
+      Свечные паттерны Нисона: Hammer, Shooting Star, Engulfing, Morning/Evening Star.<br>
+      Используются как подтверждение тренда RSI+MACD, уровней и объёма [web:53][web:49][web:56].
     </div>
   </div>
 
-  <div class="charts" style="margin-top:10px;">
-    <div class="chart-box"><div id="rsiChart" style="height:240px;"></div></div>
-    <div class="chart-box"><div id="macdChart" style="height:240px;"></div></div>
+  <div class="card">
+    <h2>RSI / MACD (H1)</h2>
+    <div id="rsi-chart"></div>
+    <div id="macd-chart"></div>
   </div>
-
-  <div class="analysis">
-    <h3>Технический анализ</h3>
-    <div id="techSummary">Расчёт...</div>
-    <ul class="reasons" id="reasonsList"></ul>
+  <div class="card">
+    <h2>Fibonacci Levels (H1)</h2>
+    <div id="fibo-chart"></div>
   </div>
+</div>
 
-  <div class="analysis">
-    <h3>Логика сигнала</h3>
-    <div id="signalDetails">Ожидание данных...</div>
-  </div>
+<script>
+// =============== CONFIG ===============
+const SYMBOL = "ERAUSDT";
+const CATEGORY = "linear"; // USDT perpetual [web:32]
+let currentInterval = 5;   // minutes: 5, 15, 60, 240
 
-  <div class="analysis">
-    <h3>Контекст ERAUSDT</h3>
-    <p>
-      ERAUSDT — USDⓈ‑маржированный перпетуальный контракт на Binance Futures. В этом дашборде используются REST‑эндпоинты <code>/fapi/v1/klines</code> и <code>/fapi/v1/ticker/24hr</code>, а также WebSocket‑потоки кандлстиков и тикера через <code>wss://fstream.binance.com/stream</code>, согласно официальной документации USDS‑M фьючерсов [web:108][web:95][web:116][web:82].
-    </p>
-    <p>
-      RSI(14) и MACD(12,26,9) на H1 комбинируются для фильтрации направленного риска: MACD задаёт направление тренда и импульс, а RSI даёт информацию о силе движения и возможной перекупленности/перепроданности, как рекомендуют современные стратегии RSI+MACD [web:70][web:83][web:84][web:92].
-    </p>
-  </div>
+document.querySelectorAll(".tf-buttons button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tf-buttons button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentInterval = parseInt(btn.getAttribute("data-tf"), 10);
+    fetchAndRender();
+  });
+});
 
-  <script>
-    const SYMBOL = "ERAUSDT";
-    const REST_BASE = "https://fapi.binance.com";
-    const WS_BASE  = "wss://fstream.binance.com/stream";
-
-    const TF_LABELS = {
-      "5m":"5m",
-      "15m":"15m",
-      "1h":"1h",
-      "4h":"4h"
+// =============== BYBIT REST v5 KLINE FETCH ===============
+async function fetchKlines(intervalMinutes, limit = 200) {
+  // Bybit v5: GET /v5/market/kline?category=linear&symbol=ERAUSDT&interval=60&limit=200 [web:12][web:32]
+  const interval = intervalMinutes.toString();
+  const url = `https://api.bybit.com/v5/market/kline?category=${CATEGORY}&symbol=${SYMBOL}&interval=${interval}&limit=${limit}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  if (!data.result || !data.result.list) {
+    console.error("Bad kline data", data);
+    return [];
+  }
+  // list: [ startTime, open, high, low, close, volume, turnover ]
+  return data.result.list.map(row => {
+    return {
+      time: Number(row[0]),
+      open: Number(row[1]),
+      high: Number(row[2]),
+      low: Number(row[3]),
+      close: Number(row[4]),
+      volume: Number(row[5])
     };
-    const TF_KLINE = {
-      "5m":"5m",
-      "15m":"15m",
-      "1h":"1h",
-      "4h":"4h"
-    };
+  }).reverse(); // по возрастанию времени
+}
 
-    let currentInterval = "1h";
-    let klineData = [];
-    let wsInstance = null;
-    let priceChartInitialized = false;
+// =============== INDICATORS (RSI / EMA / MACD) ===============
+function calcEMA(values, period) {
+  const k = 2 / (period + 1);
+  const ema = [];
+  let prevEMA = values[0];
+  ema.push(prevEMA);
+  for (let i = 1; i < values.length; i++) {
+    const curEMA = values[i] * k + prevEMA * (1 - k);
+    ema.push(curEMA);
+    prevEMA = curEMA;
+  }
+  return ema;
+}
 
-    async function fetchTicker(){
-      const res = await fetch(`${REST_BASE}/fapi/v1/ticker/24hr?symbol=${SYMBOL}`);
-      const j = await res.json();
-      return j;
+function calcRSI(closes, period = 14) {
+  const rsis = new Array(closes.length).fill(null);
+  let gains = 0;
+  let losses = 0;
+
+  for (let i = 1; i <= period; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff > 0) gains += diff;
+    else losses -= diff;
+  }
+
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+  rsis[period] = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+
+  for (let i = period + 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff > 0) {
+      gains = diff;
+      losses = 0;
+    } else {
+      gains = 0;
+      losses = -diff;
     }
+    avgGain = (avgGain * (period - 1) + gains) / period;
+    avgLoss = (avgLoss * (period - 1) + losses) / period;
+    rsis[i] = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+  }
+  return rsis;
+}
 
-    async function fetchKlines(interval = currentInterval, limit = 200){
-      const res = await fetch(`${REST_BASE}/fapi/v1/klines?symbol=${SYMBOL}&interval=${TF_KLINE[interval]}&limit=${limit}`);
-      const j = await res.json();
-      return j.map(k => ({
-        time: new Date(k[0]),
-        open: parseFloat(k[1]),
-        high: parseFloat(k[2]),
-        low: parseFloat(k[3]),
-        close: parseFloat(k[4]),
-        volume: parseFloat(k[5])
-      }));
+function calcMACD(closes, fast = 12, slow = 26, signal = 9) {
+  const emaFast = calcEMA(closes, fast);
+  const emaSlow = calcEMA(closes, slow);
+  const macd = closes.map((_, i) => emaFast[i] - emaSlow[i]);
+  const signalLine = calcEMA(macd, signal);
+  const hist = macd.map((v, i) => v - signalLine[i]);
+  return { macd, signalLine, hist };
+}
+
+// =============== FIBONACCI LEVELS (H1) ===============
+function computeFiboLevels(klines) {
+  if (klines.length === 0) return [];
+  const highs = klines.map(c => c.high);
+  const lows = klines.map(c => c.low);
+  const maxHigh = Math.max(...highs);
+  const minLow = Math.min(...lows);
+  const diff = maxHigh - minLow;
+  return [
+    { level: 0.0, price: maxHigh },
+    { level: 0.236, price: maxHigh - diff * 0.236 },
+    { level: 0.382, price: maxHigh - diff * 0.382 },
+    { level: 0.5, price: maxHigh - diff * 0.5 },
+    { level: 0.618, price: maxHigh - diff * 0.618 },
+    { level: 0.786, price: maxHigh - diff * 0.786 },
+    { level: 1.0, price: minLow }
+  ];
+}
+
+// =============== NISON CANDLE HELPERS ===============
+function isBullish(c) {
+  return c.close > c.open;
+}
+function isBearish(c) {
+  return c.close < c.open;
+}
+function bodySize(c) {
+  return Math.abs(c.close - c.open);
+}
+function totalRange(c) {
+  return c.high - c.low;
+}
+function upperShadow(c) {
+  return c.high - Math.max(c.open, c.close);
+}
+function lowerShadow(c) {
+  return Math.min(c.open, c.close) - c.low;
+}
+
+function isHammer(c) {
+  const body = bodySize(c);
+  const range = totalRange(c);
+  if (range === 0) return false;
+  const bodyRatio = body / range;
+  const lower = lowerShadow(c);
+  const upper = upperShadow(c);
+  const lowerToBody = lower / (body || 1);
+  const upperToBody = upper / (body || 1);
+  return (
+    bodyRatio <= 0.3 &&
+    lowerToBody >= 2.0 &&
+    upperToBody <= 0.5
+  );
+}
+
+function isShootingStar(c) {
+  const body = bodySize(c);
+  const range = totalRange(c);
+  if (range === 0) return false;
+  const bodyRatio = body / range;
+  const lower = lowerShadow(c);
+  const upper = upperShadow(c);
+  const upperToBody = upper / (body || 1);
+  const lowerToBody = lower / (body || 1);
+  return (
+    bodyRatio <= 0.3 &&
+    upperToBody >= 2.0 &&
+    lowerToBody <= 0.5
+  );
+}
+
+function isBullishEngulfing(prev, cur) {
+  return (
+    isBearish(prev) &&
+    isBullish(cur) &&
+    cur.close > prev.open &&
+    cur.open < prev.close &&
+    cur.high >= prev.high &&
+    cur.low <= prev.low
+  );
+}
+
+function isBearishEngulfing(prev, cur) {
+  return (
+    isBullish(prev) &&
+    isBearish(cur) &&
+    cur.close < prev.open &&
+    cur.open > prev.close &&
+    cur.high >= prev.high &&
+    cur.low <= prev.low
+  );
+}
+
+function isMorningStar(c1, c2, c3) {
+  const body1 = bodySize(c1);
+  const body2 = bodySize(c2);
+  const body3 = bodySize(c3);
+  return (
+    isBearish(c1) &&
+    isBullish(c3) &&
+    body1 > body2 &&
+    body3 > body2 &&
+    c2.low < c1.close &&
+    c3.close > (c1.open + c1.close) / 2
+  );
+}
+
+function isEveningStar(c1, c2, c3) {
+  const body1 = bodySize(c1);
+  const body2 = bodySize(c2);
+  const body3 = bodySize(c3);
+  return (
+    isBullish(c1) &&
+    isBearish(c3) &&
+    body1 > body2 &&
+    body3 > body2 &&
+    c2.high > c1.close &&
+    c3.close < (c1.open + c1.close) / 2
+  );
+}
+
+// Noise‑фильтр контекста
+function computeNisonContextScore(candle, trendDirection) {
+  let score = 0;
+  const close = candle.close;
+  const ema200 = candle.ema200;
+  const rsi = candle.rsi;
+  const macdHist = candle.macdHist;
+  const volume = candle.volume;
+  const avgVolume = candle.avgVolume;
+  const support = candle.supportLevel;
+  const resistance = candle.resistanceLevel;
+
+  if (trendDirection === "DOWN") {
+    if (close < ema200) score += 0.2;
+  } else if (trendDirection === "UP") {
+    if (close > ema200) score += 0.2;
+  }
+
+  if (support !== undefined && close <= support * 1.01) {
+    score += 0.2;
+  }
+  if (resistance !== undefined && close >= resistance * 0.99) {
+    score += 0.2;
+  }
+
+  if (avgVolume && volume >= avgVolume * 1.2) {
+    score += 0.2;
+  }
+
+  if (trendDirection === "DOWN") {
+    if (rsi <= 35) score += 0.1;
+    if (macdHist > 0) score += 0.1;
+  } else if (trendDirection === "UP") {
+    if (rsi >= 65) score += 0.1;
+    if (macdHist < 0) score += 0.1;
+  }
+
+  return score;
+}
+
+function detectNisonPatternWithContext(klines, index, trendDirection) {
+  const res = {
+    pattern: null,
+    direction: null,
+    score: 0,
+    description: ""
+  };
+
+  const c0 = klines[index];
+  const c1 = klines[index - 1];
+  const c2 = klines[index - 2];
+  if (!c0 || !c1 || !c2) return res;
+
+  if (isHammer(c0) || isBullishEngulfing(c1, c0) || isMorningStar(c2, c1, c0)) {
+    const ctxScore = computeNisonContextScore(c0, "DOWN");
+    res.pattern = isHammer(c0)
+      ? "HAMMER"
+      : isBullishEngulfing(c1, c0)
+      ? "BULLISH_ENGULFING"
+      : "MORNING_STAR";
+    res.direction = "LONG";
+    res.score = ctxScore;
+    res.description = `Bullish ${res.pattern} (score ${ctxScore.toFixed(2)})`;
+    return res;
+  }
+
+  if (isShootingStar(c0) || isBearishEngulfing(c1, c0) || isEveningStar(c2, c1, c0)) {
+    const ctxScore = computeNisonContextScore(c0, "UP");
+    res.pattern = isShootingStar(c0)
+      ? "SHOOTING_STAR"
+      : isBearishEngulfing(c1, c0)
+      ? "BEARISH_ENGULFING"
+      : "EVENING_STAR";
+    res.direction = "SHORT";
+    res.score = ctxScore;
+    res.description = `Bearish ${res.pattern} (score ${ctxScore.toFixed(2)})`;
+    return res;
+  }
+
+  return res;
+}
+
+// =============== H1 SIGNALS (RSI+MACD+NISON) ===============
+function should_long_ERAUSDT_1h(klines) {
+  const n = klines.length;
+  if (n < 3) return { bias: "NEUTRAL", reasons: [] };
+  const last = klines[n - 1];
+  const rsi = last.rsi;
+  const macdHist = last.macdHist;
+  const ema200 = last.ema200;
+  const reasons = [];
+
+  if (last.close > ema200) reasons.push("Price above EMA200 (uptrend H1)");
+  if (macdHist > 0) reasons.push("MACD histogram > 0 (bullish momentum)");
+  if (rsi > 40 && rsi < 70) reasons.push("RSI in healthy bullish range");
+
+  const patternInfo = detectNisonPatternWithContext(klines, n - 1, "DOWN");
+  if (patternInfo.pattern && patternInfo.direction === "LONG" && patternInfo.score >= 0.6) {
+    reasons.push(`Nison bullish pattern: ${patternInfo.pattern} (score ${patternInfo.score.toFixed(2)})`);
+  }
+
+  const hasTrend = last.close > ema200 && macdHist > 0;
+  const hasCandle = patternInfo.pattern && patternInfo.direction === "LONG" && patternInfo.score >= 0.6;
+
+  let bias = "NEUTRAL";
+  if (hasTrend && hasCandle) bias = "STRONG_LONG";
+  else if (hasTrend) bias = "LONG";
+
+  return { bias, reasons };
+}
+
+function should_short_ERAUSDT_1h(klines) {
+  const n = klines.length;
+  if (n < 3) return { bias: "NEUTRAL", reasons: [] };
+  const last = klines[n - 1];
+  const rsi = last.rsi;
+  const macdHist = last.macdHist;
+  const ema200 = last.ema200;
+  const reasons = [];
+
+  if (last.close < ema200) reasons.push("Price below EMA200 (downtrend H1)");
+  if (macdHist < 0) reasons.push("MACD histogram < 0 (bearish momentum)");
+  if (rsi < 60 && rsi > 30) reasons.push("RSI in healthy bearish range");
+
+  const patternInfo = detectNisonPatternWithContext(klines, n - 1, "UP");
+  if (patternInfo.pattern && patternInfo.direction === "SHORT" && patternInfo.score >= 0.6) {
+    reasons.push(`Nison bearish pattern: ${patternInfo.pattern} (score ${patternInfo.score.toFixed(2)})`);
+  }
+
+  const hasTrend = last.close < ema200 && macdHist < 0;
+  const hasCandle = patternInfo.pattern && patternInfo.direction === "SHORT" && patternInfo.score >= 0.6;
+
+  let bias = "NEUTRAL";
+  if (hasTrend && hasCandle) bias = "STRONG_SHORT";
+  else if (hasTrend) bias = "SHORT";
+
+  return { bias, reasons };
+}
+
+function classifyAdvancedERA(klinesH1) {
+  const longSig = should_long_ERAUSDT_1h(klinesH1);
+  const shortSig = should_short_ERAUSDT_1h(klinesH1);
+
+  let h1Bias = "NEUTRAL";
+  let h1Reasons = [];
+
+  if (longSig.bias === "STRONG_LONG") {
+    h1Bias = "STRONG_LONG";
+    h1Reasons = longSig.reasons;
+  } else if (shortSig.bias === "STRONG_SHORT") {
+    h1Bias = "STRONG_SHORT";
+    h1Reasons = shortSig.reasons;
+  } else if (longSig.bias === "LONG") {
+    h1Bias = "LONG";
+    h1Reasons = longSig.reasons;
+  } else if (shortSig.bias === "SHORT") {
+    h1Bias = "SHORT";
+    h1Reasons = shortSig.reasons;
+  }
+
+  return { h1Bias, h1Reasons };
+}
+
+function updateSignalUIERA(classification) {
+  const box = document.getElementById("era-h1-signal-box");
+  const list = document.getElementById("era-h1-reasons");
+  box.textContent = "H1: " + classification.h1Bias;
+
+  box.classList.remove("signal-long", "signal-short", "signal-neutral");
+  if (classification.h1Bias.includes("LONG")) box.classList.add("signal-long");
+  else if (classification.h1Bias.includes("SHORT")) box.classList.add("signal-short");
+  else box.classList.add("signal-neutral");
+
+  list.innerHTML = "";
+  classification.h1Reasons.forEach(r => {
+    const li = document.createElement("li");
+    li.textContent = "[ERA H1] " + r;
+    list.appendChild(li);
+  });
+}
+
+// =============== RENDER PLOTS ===============
+function renderPriceChart(klines) {
+  const times = klines.map(c => new Date(c.time));
+  const traceCandles = {
+    x: times,
+    open: klines.map(c => c.open),
+    high: klines.map(c => c.high),
+    low: klines.map(c => c.low),
+    close: klines.map(c => c.close),
+    type: "candlestick",
+    name: SYMBOL,
+    increasing: { line: { color: "#22c55e" } },
+    decreasing: { line: { color: "#ef4444" } }
+  };
+
+  const layout = {
+    margin: { t: 20, l: 40, r: 10, b: 30 },
+    paper_bgcolor: "#0e1117",
+    plot_bgcolor: "#0e1117",
+    xaxis: { gridcolor: "#262d38", rangeslider: { visible: false } },
+    yaxis: { gridcolor: "#262d38" }
+  };
+
+  Plotly.newPlot("price-chart", [traceCandles], layout, {responsive: true, displayModeBar: false});
+}
+
+function renderRSIMACDCharts(klinesH1) {
+  const times = klinesH1.map(c => new Date(c.time));
+  const rsiValues = klinesH1.map(c => c.rsi);
+  const macdValues = klinesH1.map(c => c.macd);
+  const macdSignal = klinesH1.map(c => c.macdSignal);
+  const macdHist = klinesH1.map(c => c.macdHist);
+
+  Plotly.newPlot("rsi-chart", [{
+    x: times,
+    y: rsiValues,
+    type: "scatter",
+    mode: "lines",
+    line: { color: "#3b82f6" },
+    name: "RSI(14)"
+  }], {
+    margin: { t: 10, l: 40, r: 10, b: 20 },
+    paper_bgcolor: "#111827",
+    plot_bgcolor: "#111827",
+    yaxis: { gridcolor: "#1f2937", range: [0, 100] },
+    xaxis: { gridcolor: "#1f2937" }
+  }, {responsive: true, displayModeBar: false});
+
+  Plotly.newPlot("macd-chart", [
+    {
+      x: times,
+      y: macdValues,
+      type: "scatter",
+      mode: "lines",
+      line: { color: "#22c55e" },
+      name: "MACD"
+    },
+    {
+      x: times,
+      y: macdSignal,
+      type: "scatter",
+      mode: "lines",
+      line: { color: "#e5e7eb" },
+      name: "Signal"
+    },
+    {
+      x: times,
+      y: macdHist,
+      type: "bar",
+      marker: { color: "#f97316" },
+      name: "Hist"
     }
+  ], {
+    margin: { t: 10, l: 40, r: 10, b: 20 },
+    paper_bgcolor: "#111827",
+    plot_bgcolor: "#111827",
+    yaxis: { gridcolor: "#1f2937" },
+    xaxis: { gridcolor: "#1f2937" }
+  }, {responsive: true, displayModeBar: false});
+}
 
-    function sma(values, period){
-      const out = Array(values.length).fill(null);
-      for(let i = period - 1; i < values.length; i++){
-        let sum = 0;
-        for(let j = i - period + 1; j <= i; j++) sum += values[j];
-        out[i] = sum / period;
-      }
-      return out;
-    }
+function renderFiboChart(klinesH1) {
+  const times = klinesH1.map(c => new Date(c.time));
+  const closes = klinesH1.map(c => c.close);
+  const fibo = computeFiboLevels(klinesH1);
 
-    function ema(values, period){
-      if (!values.length) return [];
-      const k = 2 / (period + 1);
-      const arr = [];
-      arr[0] = values[0];
-      for(let i = 1; i < values.length; i++){
-        arr[i] = values[i] * k + arr[i - 1] * (1 - k);
-      }
-      return arr;
-    }
+  const priceTrace = {
+    x: times,
+    y: closes,
+    type: "scatter",
+    mode: "lines",
+    name: "Close",
+    line: { color: "#22c55e" }
+  };
 
-    function calcRSI(closes, period = 14){
-      if (closes.length <= period) return [];
-      const rsis = Array(closes.length).fill(null);
-      let gains = 0, losses = 0;
+  const fiboTraces = fibo.map(f => ({
+    x: [times[0], times[times.length - 1]],
+    y: [f.price, f.price],
+    type: "scatter",
+    mode: "lines",
+    name: `Fib ${Math.round(f.level * 100)}%`,
+    line: { dash: "dot", width: 1, color: "#9ca3af" }
+  }));
 
-      for(let i = 1; i <= period; i++){
-        const diff = closes[i] - closes[i - 1];
-        if(diff >= 0) gains += diff;
-        else losses -= diff;
-      }
+  Plotly.newPlot("fibo-chart", [priceTrace, ...fiboTraces], {
+    margin: { t: 10, l: 40, r: 10, b: 20 },
+    paper_bgcolor: "#111827",
+    plot_bgcolor: "#111827",
+    xaxis: { gridcolor: "#1f2937" },
+    yaxis: { gridcolor: "#1f2937" }
+  }, {responsive: true, displayModeBar: false});
+}
 
-      let avgGain = gains / period;
-      let avgLoss = losses / period;
-      rsis[period] = 100 - (100 / (1 + (avgGain / (avgLoss || 1e-9))));
+// =============== MAIN PIPELINE ===============
+async function fetchAndRender() {
+  try {
+    const klines = await fetchKlines(currentInterval, 200);
 
-      for(let i = period + 1; i < closes.length; i++){
-        const diff = closes[i] - closes[i - 1];
-        const gain = diff > 0 ? diff : 0;
-        const loss = diff < 0 ? -diff : 0;
-        avgGain = (avgGain * (period - 1) + gain) / period;
-        avgLoss = (avgLoss * (period - 1) + loss) / period;
-        rsis[i] = 100 - (100 / (1 + (avgGain / (avgLoss || 1e-9))));
-      }
-      return rsis;
-    }
+    if (klines.length === 0) return;
 
-    function calcMACD(closes){
-      const ema12 = ema(closes, 12);
-      const ema26 = ema(closes, 26);
-      const macd = closes.map((_, i) => (ema12[i] ?? ema12[ema12.length - 1]) - (ema26[i] ?? ema26[ema26.length - 1]));
-      const signal = ema(macd, 9);
-      const hist = macd.map((v, i) => v - (signal[i] ?? signal[signal.length - 1]));
-      return { macd, signal, hist };
-    }
+    const closes = klines.map(c => c.close);
+    const rsis = calcRSI(closes, 14);
+    const ema200 = calcEMA(closes, 200);
+    const macdData = calcMACD(closes, 12, 26, 9);
 
-    function calcATR(kl, period = 14){
-      if (kl.length < period + 1) return Array(kl.length).fill(null);
-      const tr = [];
-      for(let i = 1; i < kl.length; i++){
-        const curr = kl[i];
-        const prev = kl[i - 1];
-        tr.push(Math.max(
-          curr.high - curr.low,
-          Math.abs(curr.high - prev.close),
-          Math.abs(curr.low - prev.close)
-        ));
-      }
+    // Добавляем индикаторы в свечи
+    let volumeSum = 0;
+    klines.forEach((c, i) => {
+      c.rsi = rsis[i] || null;
+      c.ema200 = ema200[i] || null;
+      c.macd = macdData.macd[i] || null;
+      c.macdSignal = macdData.signalLine[i] || null;
+      c.macdHist = macdData.hist[i] || null;
+      volumeSum += c.volume;
+      c.avgVolume = volumeSum / (i + 1);
+      c.supportLevel = null;    // сюда можно подставить твои уровни
+      c.resistanceLevel = null; // или рассчитать по swing high/low
+    });
 
-      const atr = Array(kl.length).fill(null);
-      let first = 0;
-      for(let i = 0; i < period; i++) first += tr[i];
-      atr[period] = first / period;
+    renderPriceChart(klines);
 
-      for(let i = period + 1; i < kl.length; i++){
-        atr[i] = ((atr[i - 1] * (period - 1)) + tr[i - 1]) / period;
-      }
-      return atr;
-    }
+    // H1‑сигналы считаем на 60‑минутном таймфрейме (если текущий != 60, отдельно забираем)
+    const h1Klines = currentInterval === 60 ? klines : await fetchKlines(60, 200);
+    if (h1Klines.length > 0) {
+      const h1Closes = h1Klines.map(c => c.close);
+      const h1Rsis = calcRSI(h1Closes, 14);
+      const h1Ema200 = calcEMA(h1Closes, 200);
+      const h1Macd = calcMACD(h1Closes, 12, 26, 9);
 
-    function calcFibo(highs, lows){
-      if (highs.length < 60 || lows.length < 60) return {};
-      const sliceHighs = highs.slice(-60);
-      const sliceLows = lows.slice(-60);
-      const swingHigh = Math.max(...sliceHighs);
-      const swingLow = Math.min(...sliceLows);
-      const diff = swingHigh - swingLow;
-
-      return {
-        "0.0 (High)": swingHigh,
-        "0.236": swingHigh - diff * 0.236,
-        "0.382": swingHigh - diff * 0.382,
-        "0.5": swingHigh - diff * 0.5,
-        "0.618": swingHigh - diff * 0.618,
-        "0.786": swingHigh - diff * 0.786,
-        "1.0 (Low)": swingLow
-      };
-    }
-
-    function detectCandleSignal(kl){
-      if (kl.length < 2) return { bull:false, bear:false, name:"none" };
-      const a = kl[kl.length - 2];
-      const b = kl[kl.length - 1];
-
-      const bullEngulf =
-        b.close > b.open &&
-        a.close < a.open &&
-        b.open <= a.close &&
-        b.close >= a.open;
-
-      const bearEngulf =
-        b.close < b.open &&
-        a.close > a.open &&
-        b.open >= a.close &&
-        b.close <= a.open;
-
-      if (bullEngulf) return { bull:true, bear:false, name:"bullish engulfing" };
-      if (bearEngulf) return { bull:false, bear:true, name:"bearish engulfing" };
-      return { bull:false, bear:false, name:"none" };
-    }
-
-    function nearestFiboBias(price, fibo){
-      if (!fibo || !Object.keys(fibo).length) return { long:false, short:false, text:"Fib n/a" };
-      const vals = Object.entries(fibo).map(([k,v]) => ({ level:k, price:v }));
-      vals.sort((a,b) => Math.abs(a.price - price) - Math.abs(b.price - price));
-      const nearest = vals[0];
-      const dist = Math.abs(nearest.price - price) / price;
-
-      if (dist > 0.01) return { long:false, short:false, text:`далеко от Fib (${nearest.level})` };
-
-      if (nearest.level.includes("0.618") || nearest.level.includes("0.786") || nearest.level.includes("1.0")) {
-        return { long:true, short:false, text:`цена у поддержки Fib ${nearest.level}` };
-      }
-      if (nearest.level.includes("0.236") || nearest.level.includes("0.0")) {
-        return { long:false, short:true, text:`цена у сопротивления Fib ${nearest.level}` };
-      }
-      return { long:false, short:false, text:`цена у нейтрального Fib ${nearest.level}` };
-    }
-
-    function should_long_ERAUSDT_1h(ctx){
-      const rsi    = ctx.rsiLast;
-      const macd   = ctx.macdLast;
-      const signal = ctx.signalLast;
-      const hist   = ctx.histLast;
-      const price  = ctx.closeLast;
-      const sma20  = ctx.sma20Last;
-      const sma50  = ctx.sma50Last;
-
-      const rsi_ok =
-        rsi != null &&
-        rsi > 50 &&
-        rsi < 70;
-
-      const macd_bull =
-        macd != null && signal != null && hist != null &&
-        macd > signal &&
-        hist > 0;
-
-      const trend_ok =
-        sma20 == null || sma50 == null
-          ? true
-          : (price > sma20 && sma20 >= sma50);
-
-      const ok = rsi_ok && macd_bull && trend_ok;
-
-      const reasons = [];
-      if (!rsi_ok)    reasons.push("RSI ERAUSDT на H1 не в бычьей зоне 50–70");
-      if (!macd_bull) reasons.push("MACD ERAUSDT на H1 не даёт устойчивый бычий сигнал");
-      if (!trend_ok)  reasons.push("Цена/SMA для ERAUSDT не подтверждают восходящий тренд");
-
-      return {
-        shouldLong: ok,
-        reasons: ok
-          ? ["ERAUSDT H1: RSI 50–70, MACD > Signal, hist > 0, тренд восходящий"]
-          : reasons
-      };
-    }
-
-    function should_short_ERAUSDT_1h(ctx){
-      const rsi    = ctx.rsiLast;
-      const macd   = ctx.macdLast;
-      const signal = ctx.signalLast;
-      const hist   = ctx.histLast;
-      const price  = ctx.closeLast;
-      const sma20  = ctx.sma20Last;
-      const sma50  = ctx.sma50Last;
-
-      const rsi_overbought =
-        rsi != null && rsi > 70;
-
-      const rsi_bear_bias =
-        rsi != null && rsi < 50;
-
-      const rsi_ok = rsi_overbought || rsi_bear_bias;
-
-      const macd_bear =
-        macd != null && signal != null && hist != null &&
-        macd < signal &&
-        hist < 0;
-
-      const trend_ok =
-        sma20 == null || sma50 == null
-          ? true
-          : (price < sma20 && sma20 <= sma50);
-
-      const ok = rsi_ok && macd_bear && trend_ok;
-
-      const reasons = [];
-      if (!rsi_ok)    reasons.push("RSI ERAUSDT на H1 не даёт медвежьего сигнала (нет перекупленности, rsi >=50)");
-      if (!macd_bear) reasons.push("MACD ERAUSDT на H1 не подтверждает медвежий импульс");
-      if (!trend_ok)  reasons.push("Цена/SMA для ERAUSDT не подтверждают нисходящий тренд");
-
-      return {
-        shouldShort: ok,
-        reasons: ok
-          ? ["ERAUSDT H1: RSI перекуплен или ниже 50, MACD < Signal, hist < 0, тренд нисходящий"]
-          : reasons
-      };
-    }
-
-    function classifyAdvanced(kl, rsis, macdObj, fiboLevels, tf){
-      const closes  = kl.map(k => k.close);
-      const volumes = kl.map(k => k.volume);
-      const last    = closes[closes.length - 1];
-      const prev    = closes[closes.length - 2] ?? last;
-
-      const rsiLast    = rsis[rsis.length - 1];
-      const macdLast   = macdObj.macd[macdObj.macd.length - 1];
-      const signalLast = macdObj.signal[macdObj.signal.length - 1];
-      const histLast   = macdObj.hist[macdObj.hist.length - 1];
-
-      const sma20Arr = sma(closes, 20);
-      const sma50Arr = sma(closes, 50);
-      const ema9Arr  = ema(closes, 9);
-      const ema21Arr = ema(closes, 21);
-      const atr14Arr = calcATR(kl, 14);
-      const avgVol20 = sma(volumes, 20);
-      const candle   = detectCandleSignal(kl);
-      const fibBias  = nearestFiboBias(last, fiboLevels);
-
-      const sma20Last  = sma20Arr[sma20Arr.length - 1];
-      const sma50Last  = sma50Arr[sma50Arr.length - 1];
-      const ema9Last   = ema9Arr[ema9Arr.length - 1];
-      const ema21Last  = ema21Arr[ema21Arr.length - 1];
-      const avgVolLast = avgVol20[avgVol20.length - 1];
-      const atrNow     = atr14Arr[atr14Arr.length - 1] ?? null;
-
-      let longScore  = 0;
-      let shortScore = 0;
-      const reasons  = [];
-
-      if (rsiLast != null) {
-        if (rsiLast < 32) {
-          longScore += 2;
-          reasons.push("RSI ERAUSDT в перепроданности");
-        } else if (rsiLast > 68) {
-          shortScore += 2;
-          reasons.push("RSI ERAUSDT в перекупленности");
-        } else if (rsiLast > 50) {
-          longScore += 1;
-          reasons.push("RSI ERAUSDT выше 50");
-        } else {
-          shortScore += 1;
-          reasons.push("RSI ERAUSDT ниже 50");
-        }
-      }
-
-      if (macdLast > signalLast && histLast > 0) {
-        longScore += 2;
-        reasons.push("MACD ERAUSDT bullish");
-      }
-      if (macdLast < signalLast && histLast < 0) {
-        shortScore += 2;
-        reasons.push("MACD ERAUSDT bearish");
-      }
-
-      if (sma20Last != null) {
-        if (last > sma20Last) {
-          longScore += 1;
-          reasons.push("ERAUSDT цена выше SMA20");
-        } else {
-          shortScore += 1;
-          reasons.push("ERAUSDT цена ниже SMA20");
-        }
-      }
-
-      if (sma20Last != null && sma50Last != null) {
-        if (sma20Last > sma50Last) {
-          longScore += 1;
-          reasons.push("SMA20 ERAUSDT выше SMA50");
-        } else {
-          shortScore += 1;
-          reasons.push("SMA20 ERAUSDT ниже SMA50");
-        }
-      }
-
-      if (ema9Last != null && ema21Last != null) {
-        if (ema9Last > ema21Last) {
-          longScore += 1;
-          reasons.push("EMA9 ERAUSDT выше EMA21");
-        } else {
-          shortScore += 1;
-          reasons.push("EMA9 ERAUSDT ниже EMA21");
-        }
-      }
-
-      if (avgVolLast != null && avgVolLast > 0 &&
-          volumes[volumes.length - 1] > avgVolLast * 1.2) {
-        if (last > prev) {
-          longScore += 1;
-          reasons.push("ERAUSDT рост на повышенном объёме");
-        }
-        if (last < prev) {
-          shortScore += 1;
-          reasons.push("ERAUSDT снижение на повышенном объёме");
-        }
-      }
-
-      if (candle.bull) {
-        longScore += 2;
-        reasons.push(`Свечной паттерн ERAUSDT: ${candle.name}`);
-      }
-      if (candle.bear) {
-        shortScore += 2;
-        reasons.push(`Свечной паттерн ERAUSDT: ${candle.name}`);
-      }
-
-      if (fibBias.long)  {
-        longScore += 1;
-        reasons.push(fibBias.text);
-      }
-      if (fibBias.short) {
-        shortScore += 1;
-        reasons.push(fibBias.text);
-      }
-
-      let setupTf = "15m";
-      if (tf === "1h")  setupTf = "5m–15m";
-      if (tf === "4h")  setupTf = "15m–1h";
-      if (tf === "15m") setupTf = "5m";
-      if (tf === "5m")  setupTf = "5m";
-
-      const entry = last;
-      let sl  = null;
-      let tp1 = null;
-      let tp2 = null;
-      let label = "NEUTRAL";
-      let cls   = "sig-neutral";
-
-      if (longScore - shortScore >= 6)      { label = "STRONG LONG";  cls = "sig-long"; }
-      else if (longScore - shortScore >= 3) { label = "LONG";         cls = "sig-long"; }
-      else if (shortScore - longScore >= 6) { label = "STRONG SHORT"; cls = "sig-short"; }
-      else if (shortScore - longScore >= 3) { label = "SHORT";        cls = "sig-short"; }
-
-      if (atrNow != null) {
-        if (label.includes("LONG")) {
-          sl  = entry - atrNow * 1.2;
-          tp1 = entry + atrNow * 1.5;
-          tp2 = entry + atrNow * 2.5;
-        } else if (label.includes("SHORT")) {
-          sl  = entry + atrNow * 1.2;
-          tp1 = entry - atrNow * 1.5;
-          tp2 = entry - atrNow * 2.5;
-        }
-      }
-
-      const ctx = {
-        rsiLast,
-        macdLast,
-        signalLast,
-        histLast,
-        closeLast: entry,
-        sma20Last,
-        sma50Last
-      };
-
-      const longDecision  = should_long_ERAUSDT_1h(ctx);
-      const shortDecision = should_short_ERAUSDT_1h(ctx);
-
-      let h1Bias = "NEUTRAL";
-      const h1Reasons = [];
-
-      if (longDecision.shouldLong && !shortDecision.shouldShort) {
-        h1Bias = "LONG";
-        h1Reasons.push(...longDecision.reasons);
-      } else if (shortDecision.shouldShort && !longDecision.shouldLong) {
-        h1Bias = "SHORT";
-        h1Reasons.push(...shortDecision.reasons);
-      } else {
-        h1Bias = "NEUTRAL";
-        h1Reasons.push("RSI+MACD ERAUSDT на H1 не дают однозначного long/short");
-        h1Reasons.push(...longDecision.reasons, ...shortDecision.reasons);
-      }
-
-      return {
-        label, cls, longScore, shortScore, reasons,
-        entry, sl, tp1, tp2, atrNow, setupTf,
-        rsiLast, macdLast, signalLast, histLast,
-        sma20Last, sma50Last, ema9Last, ema21Last,
-        h1Bias, h1Reasons
-      };
-    }
-
-    function fmt(v, d = 6){
-      return Number.isFinite(v) ? v.toFixed(d) : "-";
-    }
-
-    function renderFiboTable(levels, currentPrice){
-      const tbody = document.querySelector("#fiboTbl tbody");
-      tbody.innerHTML = "<tr><th>Уровень</th><th>Цена</th></tr>";
-
-      for(const [k,v] of Object.entries(levels)){
-        const near = Math.abs(v - currentPrice) / currentPrice < 0.01;
-        tbody.innerHTML += `
-          <tr style="${near ? 'color:#d29922;font-weight:700' : ''}">
-            <td>${k}</td>
-            <td>${v.toFixed(6)}</td>
-          </tr>
-        `;
-      }
-    }
-
-    function renderPriceChart(kl, fiboLevels){
-      const x = kl.map(k => k.time);
-      const closes = kl.map(k => k.close);
-      const sma20Line = sma(closes, 20);
-      const sma50Line = sma(closes, 50);
-      const ema9Line = ema(closes, 9);
-      const ema21Line = ema(closes, 21);
-
-      const traces = [{
-        x,
-        open: kl.map(k => k.open),
-        high: kl.map(k => k.high),
-        low: kl.map(k => k.low),
-        close: closes,
-        type: "candlestick",
-        name: "Price",
-        increasing: { line: { color: "#3fb950" } },
-        decreasing: { line: { color: "#f85149" } }
-      },{
-        x, y: sma20Line, type:"scatter", mode:"lines", name:"SMA20",
-        line:{ color:"#58a6ff", width:1.2 }
-      },{
-        x, y: sma50Line, type:"scatter", mode:"lines", name:"SMA50",
-        line:{ color:"#d29922", width:1.2 }
-      },{
-        x, y: ema9Line, type:"scatter", mode:"lines", name:"EMA9",
-        line:{ color:"#bc8cff", width:1 }
-      },{
-        x, y: ema21Line, type:"scatter", mode:"lines", name:"EMA21",
-        line:{ color:"#8b949e", width:1, dash:"dot" }
-      }];
-
-      const shapes = [];
-      Object.entries(fiboLevels || {}).forEach(([label, price]) => {
-        shapes.push({
-          type:"line",
-          xref:"paper",
-          x0:0,
-          x1:1,
-          y0:price,
-          y1:price,
-          line:{
-            color: label.includes("0.618") || label.includes("0.786") ? "#d29922" : "#30363d",
-            width: label.includes("0.618") || label.includes("0.786") ? 1.2 : 1,
-            dash:"dot"
-          }
-        });
+      let volSumH1 = 0;
+      h1Klines.forEach((c, i) => {
+        c.rsi = h1Rsis[i] || null;
+        c.ema200 = h1Ema200[i] || null;
+        c.macd = h1Macd.macd[i] || null;
+        c.macdSignal = h1Macd.signalLine[i] || null;
+        c.macdHist = h1Macd.hist[i] || null;
+        volSumH1 += c.volume;
+        c.avgVolume = volSumH1 / (i + 1);
+        c.supportLevel = null;
+        c.resistanceLevel = null;
       });
 
-      Plotly.newPlot("priceChart", traces, {
-        paper_bgcolor:"#161b22",
-        plot_bgcolor:"#161b22",
-        font:{ color:"#e6e6e6", size:10 },
-        margin:{ t:20, l:40, r:10, b:30 },
-        xaxis:{ rangeslider:{ visible:false }, gridcolor:"#262d38" },
-        yaxis:{ gridcolor:"#262d38" },
-        legend:{ orientation:"h", y:1.08, x:0 },
-        shapes
-      }, { responsive:true, displayModeBar:false });
-
-      priceChartInitialized = true;
+      const classification = classifyAdvancedERA(h1Klines);
+      updateSignalUIERA(classification);
+      renderRSIMACDCharts(h1Klines);
+      renderFiboChart(h1Klines);
     }
+  } catch (e) {
+    console.error("Error in fetchAndRender", e);
+  }
+}
 
-    function updatePriceChart(fiboLevels){
-      if (!priceChartInitialized) return;
-      const closes = klineData.map(k => k.close);
-
-      Plotly.react("priceChart", [{
-        x:klineData.map(k => k.time),
-        open:klineData.map(k => k.open),
-        high:klineData.map(k => k.high),
-        low:klineData.map(k => k.low),
-        close:closes,
-        type:"candlestick",
-        name:"Price",
-        increasing:{ line:{ color:"#3fb950" } },
-        decreasing:{ line:{ color:"#f85149" } }
-      },{
-        x:klineData.map(k => k.time),
-        y:sma(closes, 20),
-        type:"scatter",
-        mode:"lines",
-        name:"SMA20",
-        line:{ color:"#58a6ff", width:1.2 }
-      },{
-        x:klineData.map(k => k.time),
-        y:sma(closes, 50),
-        type:"scatter",
-        mode:"lines",
-        name:"SMA50",
-        line:{ color:"#d29922", width:1.2 }
-      },{
-        x:klineData.map(k => k.time),
-        y:ema(closes, 9),
-        type:"scatter",
-        mode:"lines",
-        name:"EMA9",
-        line:{ color:"#bc8cff", width:1 }
-      },{
-        x:klineData.map(k => k.time),
-        y:ema(closes, 21),
-        type:"scatter",
-        mode:"lines",
-        name:"EMA21",
-        line:{ color:"#8b949e", width:1, dash:"dot" }
-      }], {
-        paper_bgcolor:"#161b22",
-        plot_bgcolor:"#161b22",
-        font:{ color:"#e6e6e6", size:10 },
-        margin:{ t:20, l:40, r:10, b:30 },
-        xaxis:{ rangeslider:{ visible:false }, gridcolor:"#262d38" },
-        yaxis:{ gridcolor:"#262d38" },
-        legend:{ orientation:"h", y:1.08, x:0 },
-        shapes:Object.entries(fiboLevels || {}).map(([label, price]) => ({
-          type:"line",
-          xref:"paper",
-          x0:0,
-          x1:1,
-          y0:price,
-          y1:price,
-          line:{
-            color: label.includes("0.618") || label.includes("0.786") ? "#d29922" : "#30363d",
-            width: label.includes("0.618") || label.includes("0.786") ? 1.2 : 1,
-            dash:"dot"
-          }
-        }))
-      }, { responsive:true, displayModeBar:false });
-    }
-
-    function renderRSIChart(kl, rsis){
-      const x = kl.map(k => k.time);
-      Plotly.newPlot("rsiChart", [{
-        x,
-        y: rsis,
-        type:"scatter",
-        mode:"lines",
-        line:{ color:"#58a6ff", width:1.5 },
-        name:"RSI"
-      },{
-        x,
-        y: Array(rsis.length).fill(70),
-        type:"scatter",
-        mode:"lines",
-        line:{ color:"#f85149", width:1, dash:"dot" },
-        showlegend:false
-      },{
-        x,
-        y: Array(rsis.length).fill(50),
-        type:"scatter",
-        mode:"lines",
-        line:{ color:"#8b949e", width:1, dash:"dot" },
-        showlegend:false
-      },{
-        x,
-        y: Array(rsis.length).fill(30),
-        type:"scatter",
-        mode:"lines",
-        line:{ color:"#3fb950", width:1, dash:"dot" },
-        showlegend:false
-      }], {
-        paper_bgcolor:"#161b22",
-        plot_bgcolor:"#161b22",
-        font:{ color:"#e6e6e6", size:10 },
-        margin:{ t:20, l:40, r:10, b:30 },
-        xaxis:{ gridcolor:"#262d38" },
-        yaxis:{ gridcolor:"#262d38", range:[0,100] }
-      }, { responsive:true, displayModeBar:false });
-    }
-
-    function renderMACDChart(kl, macdObj){
-      const x = kl.map(k => k.time);
-      Plotly.newPlot("macdChart", [{
-        x,
-        y: macdObj.macd,
-        type:"scatter",
-        mode:"lines",
-        name:"MACD",
-        line:{ color:"#58a6ff", width:1.3 }
-      },{
-        x,
-        y: macdObj.signal,
-        type:"scatter",
-        mode:"lines",
-        name:"Signal",
-        line:{ color:"#d29922", width:1.3 }
-      },{
-        x,
-        y: macdObj.hist,
-        type:"bar",
-        name:"Hist",
-        marker:{ color: macdObj.hist.map(v => v >= 0 ? "#3fb950" : "#f85149") }
-      }], {
-        paper_bgcolor:"#161b22",
-        plot_bgcolor:"#161b22",
-        font:{ color:"#e6e6e6", size:10 },
-        margin:{ t:20, l:40, r:10, b:30 },
-        xaxis:{ gridcolor:"#262d38" },
-        yaxis:{ gridcolor:"#262d38" }
-      }, { responsive:true, displayModeBar:false });
-    }
-
-    function updateSignalUI(sig){
-      const box = document.getElementById("signalBox");
-      box.textContent = `Сигнал: ${sig.label} | TF входа: ${sig.setupTf}`;
-      box.className = "signal-box " + sig.cls;
-
-      document.getElementById("entryVal").textContent = fmt(sig.entry);
-      document.getElementById("slVal").textContent = sig.sl != null ? fmt(sig.sl) : "-";
-      document.getElementById("tp1Val").textContent = sig.tp1 != null ? fmt(sig.tp1) : "-";
-      document.getElementById("tp2Val").textContent = sig.tp2 != null ? fmt(sig.tp2) : "-";
-
-      document.getElementById("techSummary").innerHTML = `
-        RSI: <b>${fmt(sig.rsiLast, 2)}</b>,
-        MACD: <b>${fmt(sig.macdLast)}</b>,
-        Signal: <b>${fmt(sig.signalLast)}</b>,
-        Hist: <b>${fmt(sig.histLast)}</b><br>
-        SMA20: <b>${fmt(sig.sma20Last)}</b>,
-        SMA50: <b>${fmt(sig.sma50Last)}</b>,
-        EMA9: <b>${fmt(sig.ema9Last)}</b>,
-        EMA21: <b>${fmt(sig.ema21Last)}</b>,
-        ATR14: <b>${sig.atrNow != null ? fmt(sig.atrNow) : "-"}</b><br>
-        H1 bias ERAUSDT (RSI+MACD): <b>${sig.h1Bias}</b>
-      `;
-
-      document.getElementById("signalDetails").innerHTML = `
-        Score Long/Short: <b>${sig.longScore}/${sig.shortScore}</b><br>
-        H1 bias используется как фильтр: входы на 5m–15m допускаются, когда bias LONG/SHORT согласован
-        с консолидированным сигналом дашборда.
-      `;
-
-      const list = document.getElementById("reasonsList");
-      list.innerHTML = "";
-      sig.reasons.forEach(r => {
-        const li = document.createElement("li");
-        li.textContent = r;
-        list.appendChild(li);
-      });
-      sig.h1Reasons.forEach(r => {
-        const li = document.createElement("li");
-        li.textContent = "[ERA H1] " + r;
-        list.appendChild(li);
-      });
-    }
-
-    function recalcAndRenderFromKlines(lastPriceOverride = null){
-      if (!klineData.length) return;
-
-      const closes = klineData.map(k => k.close);
-      const highs  = klineData.map(k => k.high);
-      const lows   = klineData.map(k => k.low);
-      const rsis   = calcRSI(closes, 14);
-      const macdObj = calcMACD(closes);
-      const fiboLevels = calcFibo(highs, lows);
-      const lastPrice = lastPriceOverride ?? closes[closes.length - 1];
-
-      renderFiboTable(fiboLevels, lastPrice);
-
-      if (!priceChartInitialized) renderPriceChart(klineData, fiboLevels);
-      else updatePriceChart(fiboLevels);
-
-      renderRSIChart(klineData, rsis);
-      renderMACDChart(klineData, macdObj);
-
-      const sig = classifyAdvanced(klineData, rsis, macdObj, fiboLevels, currentInterval);
-      updateSignalUI(sig);
-
-      const lastVol = klineData[klineData.length - 1]?.volume;
-      document.getElementById("lastVol").textContent = Number.isFinite(lastVol) ? lastVol.toFixed(0) : "-";
-      document.getElementById("fibHint").textContent = `swing ${TF_LABELS[currentInterval]}`;
-    }
-
-    async function updateDashboardREST(){
-      try{
-        document.getElementById("status").textContent = `Загрузка данных Binance (${TF_LABELS[currentInterval]})...`;
-
-        const [ticker, kl] = await Promise.all([
-          fetchTicker(),
-          fetchKlines(currentInterval, 200)
-        ]);
-
-        klineData = kl;
-
-        const lastPrice = parseFloat(ticker.lastPrice);
-        const chg24 = parseFloat(ticker.priceChangePercent);
-        const high  = parseFloat(ticker.highPrice);
-        const low   = parseFloat(ticker.lowPrice);
-        const mark  = parseFloat(ticker.lastPrice); // для простоты mark ~ last
-
-        document.getElementById("price").textContent = Number.isFinite(lastPrice) ? lastPrice.toFixed(6) : "-";
-        document.getElementById("chg24").textContent = Number.isFinite(chg24) ? chg24.toFixed(2) + "%" : "-";
-        document.getElementById("chg24").className = "value " + (chg24 >= 0 ? "green" : "red");
-        document.getElementById("mark").textContent  = Number.isFinite(mark) ? mark.toFixed(6) : "-";
-        document.getElementById("hiLo").textContent  =
-          (Number.isFinite(high) && Number.isFinite(low))
-            ? `${high.toFixed(6)} / ${low.toFixed(6)}`
-            : "-";
-
-        recalcAndRenderFromKlines(lastPrice);
-        document.getElementById("status").textContent = `Обновлено (REST): ${new Date().toLocaleString()}`;
-      } catch(e){
-        console.error(e);
-        document.getElementById("status").textContent = "Ошибка REST: " + e.message;
-      }
-    }
-
-    function clearWs(){
-      if (wsInstance) {
-        try { wsInstance.close(); } catch(e){}
-        wsInstance = null;
-      }
-    }
-
-    function initWebSocket(){
-      try{
-        clearWs();
-        const streams = [
-          `${SYMBOL.toLowerCase()}@ticker`,
-          `${SYMBOL.toLowerCase()}@kline_${TF_KLINE[currentInterval]}`
-        ].join("/");
-        const ws = new WebSocket(`${WS_BASE}?streams=${streams}`);
-        wsInstance = ws;
-
-        ws.onopen = () => {
-          document.getElementById("status").textContent =
-            `WebSocket подключён: ${streams}`;
-        };
-
-        ws.onmessage = (ev) => {
-          try{
-            const data = JSON.parse(ev.data);
-            const stream = data.stream;
-            const payload = data.data;
-
-            if (stream && stream.includes("@ticker")) {
-              const lastPrice = parseFloat(payload.c);
-              const chg24     = parseFloat(payload.P);
-              if (Number.isFinite(lastPrice)) {
-                document.getElementById("price").textContent = lastPrice.toFixed(6);
-                document.getElementById("mark").textContent  = lastPrice.toFixed(6);
-              }
-              if (Number.isFinite(chg24)) {
-                document.getElementById("chg24").textContent = chg24.toFixed(2) + "%";
-                document.getElementById("chg24").className   = "value " + (chg24 >= 0 ? "green" : "red");
-              }
-            }
-
-            if (stream && stream.includes("@kline_")) {
-              const k = payload.k;
-              const candle = {
-                time: new Date(k.t),
-                open: parseFloat(k.o),
-                high: parseFloat(k.h),
-                low: parseFloat(k.l),
-                close: parseFloat(k.c),
-                volume: parseFloat(k.v)
-              };
-
-              if (!klineData.length) {
-                klineData.push(candle);
-              } else {
-                const incomingTime = +candle.time;
-                const lastExistingTime = +klineData[klineData.length - 1].time;
-                if (incomingTime > lastExistingTime) {
-                  klineData.push(candle);
-                  if (klineData.length > 200) klineData.shift();
-                } else {
-                  klineData[klineData.length - 1] = candle;
-                }
-              }
-
-              recalcAndRenderFromKlines(candle.close);
-            }
-          } catch(e){
-            console.error("WS message error", e);
-          }
-        };
-
-        ws.onerror = (err) => {
-          console.error("WS error", err);
-          document.getElementById("status").textContent = "Ошибка WebSocket, см. консоль.";
-        };
-
-        ws.onclose = () => {
-          document.getElementById("status").textContent = "WebSocket отключён, реконнект через 10 секунд.";
-          setTimeout(() => {
-            initWebSocket();
-          }, 10000);
-        };
-      } catch(e){
-        console.error("WS init error", e);
-      }
-    }
-
-    function setupTfButtons(){
-      document.querySelectorAll(".tf-btn").forEach(btn => {
-        btn.addEventListener("click", async () => {
-          const tf = btn.dataset.tf;
-          if (tf === currentInterval) return;
-
-          currentInterval = tf;
-          document.querySelectorAll(".tf-btn").forEach(b => b.classList.remove("active"));
-          btn.classList.add("active");
-          document.getElementById("activeTfLabel").textContent = `Таймфрейм: ${TF_LABELS[currentInterval]}`;
-
-          document.getElementById("status").textContent =
-            `Смена таймфрейма на ${TF_LABELS[currentInterval]}...`;
-
-          priceChartInitialized = false;
-          await updateDashboardREST();
-          initWebSocket();
-        });
-      });
-    }
-
-    setupTfButtons();
-    updateDashboardREST();
-    setInterval(updateDashboardREST, 300000);
-    initWebSocket();
-  </script>
+// init
+fetchAndRender();
+setInterval(fetchAndRender, 60 * 1000); // обновление раз в минуту
+</script>
 </body>
 </html>
