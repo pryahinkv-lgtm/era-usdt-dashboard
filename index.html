@@ -11,7 +11,9 @@
     .card{background:#161b22;border:1px solid #262d38;border-radius:8px;padding:10px 14px;}
     .card .label{font-size:11px;color:#8b949e;text-transform:uppercase;}
     .card .value{font-size:18px;font-weight:600;margin-top:4px;}
-    .green{color:#3fb950;} .red{color:#f85149;} .yellow{color:#d29922;}
+    .green{color:#3fb950;}
+    .red{color:#f85149;}
+    .yellow{color:#d29922;}
     .signal-box{padding:14px;border-radius:8px;font-size:16px;font-weight:700;text-align:center;margin-bottom:14px;}
     .sig-long{background:#0f3d24;color:#3fb950;border:1px solid #3fb950;}
     .sig-short{background:#3d0f14;color:#f85149;border:1px solid #f85149;}
@@ -23,427 +25,481 @@
     table{width:100%;font-size:12px;border-collapse:collapse;}
     td,th{padding:4px 6px;border-bottom:1px solid #262d38;}
     #status{font-size:12px;color:#8b949e;}
+    @media (max-width: 900px){
+      .grid{grid-template-columns:repeat(2,1fr);}
+      .charts{grid-template-columns:1fr;}
+    }
+    @media (max-width: 560px){
+      .grid{grid-template-columns:1fr;}
+    }
   </style>
 </head>
 <body>
+  <h1>ERA/USDT — Мониторинг фьючерса (Bybit Linear)</h1>
+  <div id="status">Загрузка...</div>
 
-<h1>ERA/USDT — Мониторинг фьючерса (Bybit Linear)</h1>
-<div id="status">Загрузка...</div>
-
-<div class="grid">
-  <div class="card"><div class="label">Цена</div><div class="value" id="price">-</div></div>
-  <div class="card"><div class="label">24ч изменение</div><div class="value" id="chg24">-</div></div>
-  <div class="card"><div class="label">Funding Rate</div><div class="value" id="funding">-</div></div>
-  <div class="card"><div class="label">Open Interest</div><div class="value" id="oi">-</div></div>
-</div>
-
-<div class="signal-box sig-neutral" id="signalBox">Расчёт сигнала...</div>
-
-<div class="charts">
-  <div class="chart-box" id="priceChart" style="height:420px;"></div>
-  <div class="chart-box" id="fiboTable">
-    <b>Уровни Фибоначчи (H1, последний свинг)</b>
-    <table id="fiboTbl"><tbody></tbody></table>
+  <div class="grid">
+    <div class="card"><div class="label">Цена</div><div class="value" id="price">-</div></div>
+    <div class="card"><div class="label">24ч изменение</div><div class="value" id="chg24">-</div></div>
+    <div class="card"><div class="label">Funding Rate</div><div class="value" id="funding">-</div></div>
+    <div class="card"><div class="label">Open Interest</div><div class="value" id="oi">-</div></div>
   </div>
-</div>
 
-<div class="charts" style="margin-top:10px;">
-  <div class="chart-box" id="rsiChart" style="height:220px;"></div>
-  <div class="chart-box" id="macdChart" style="height:220px;"></div>
-</div>
+  <div class="signal-box sig-neutral" id="signalBox">Расчёт сигнала...</div>
 
-<div class="analysis">
-  <h3>Технический анализ (авто)</h3>
-  <div id="techText">Расчёт...</div>
-</div>
+  <div class="charts">
+    <div class="chart-box" id="priceChart" style="height:420px;"></div>
+    <div class="chart-box" id="fiboTable">
+      <b>Уровни Фибоначчи (H1, последний свинг)</b>
+      <table id="fiboTbl"><tbody></tbody></table>
+    </div>
+  </div>
 
-<div class="analysis">
-  <h3>Фундаментальный анализ — Caldera (ERA)</h3>
-  <p><b>Проект:</b> Caldera — модульная rollup‑платформа для Ethereum ("Internet of Rollups"), обеспечивающая горизонтальное масштабирование и взаимосвязь между роллапами через протокол Metalayer.</p>
-  <p><b>Токеномика:</b> общий supply — 1,000,000,000 ERA, старт circulating supply — 148,500,000 (14.85%). Крупнейшая доля выделена ранним инвесторам и фонду (Sequoia, Dragonfly, Founders Fund входят в число бэкеров), поэтому на горизонте 12–36 месяцев действует существенный график анлоков команды и инвесторов.</p>
-  <p><b>Утилита токена:</b> оплата межсетевых газовых транзакций, управление протоколом (governance), стейкинг для сети и субсетей.</p>
-  <p><b>Риски:</b> регулярные разлоки токенов у Foundation, R&D и Community Treasury создают постоянное давление предложения; ликвидность и капитализация (~десятки млн $) делают пару волатильной на новостном фоне.</p>
-  <p style="color:#8b949e;font-size:11px;">Данные по токеномике собраны из открытых источников (CoinGecko, Binance Research, документация Caldera) на дату формирования дашборда. Не является инвестиционной рекомендацией.</p>
-</div>
+  <div class="charts" style="margin-top:10px;">
+    <div class="chart-box" id="rsiChart" style="height:220px;"></div>
+    <div class="chart-box" id="macdChart" style="height:220px;"></div>
+  </div>
 
-<script>
-const SYMBOL = "ERAUSDT";
-const REST = "https://api.bybit.com/v5/market";
-const WS_PUBLIC_LINEAR = "wss://stream.bybit.com/v5/public/linear"; // публичный WS для linear[web:27]
-let klineData = [];
-let priceChartInitialized = false;
+  <div class="analysis">
+    <h3>Технический анализ (авто)</h3>
+    <div id="techText">Расчёт...</div>
+  </div>
 
-// ---- REST API ----
+  <div class="analysis">
+    <h3>Фундаментальный анализ — Caldera (ERA)</h3>
+    <p><b>Проект:</b> Caldera — модульная rollup‑платформа для Ethereum ("Internet of Rollups"), обеспечивающая горизонтальное масштабирование и взаимосвязь между роллапами через протокол Metalayer.</p>
+    <p><b>Токеномика:</b> общий supply — 1,000,000,000 ERA, старт circulating supply — 148,500,000 (14.85%). Крупнейшая доля выделена ранним инвесторам и фонду, поэтому на горизонте 12–36 месяцев действует существенный график анлоков команды и инвесторов.</p>
+    <p><b>Утилита токена:</b> оплата межсетевых газовых транзакций, управление протоколом (governance), стейкинг для сети и субсетей.</p>
+    <p><b>Риски:</b> регулярные разлоки токенов у Foundation, R&D и Community Treasury создают постоянное давление предложения; ликвидность и капитализация делают пару волатильной на новостном фоне.</p>
+    <p style="color:#8b949e;font-size:11px;">Данные по токеномике собраны из открытых источников на дату формирования дашборда. Не является инвестиционной рекомендацией.</p>
+  </div>
 
-async function fetchTicker(){
-  const res = await fetch(`${REST}/tickers?category=linear&symbol=${SYMBOL}`);
-  const j = await res.json();
-  return j.result.list[0];
-}
+  <script>
+    const SYMBOL = "ERAUSDT";
+    const REST = "https://api.bybit.com/v5/market";
+    const WS_PUBLIC_LINEAR = "wss://stream.bybit.com/v5/public/linear";
 
-async function fetchKlines(interval="60", limit=200){
-  const res = await fetch(`${REST}/kline?category=linear&symbol=${SYMBOL}&interval=${interval}&limit=${limit}`);
-  const j = await res.json();
-  return j.result.list.reverse().map(k=>({
-    time: new Date(parseInt(k[0])),
-    open: parseFloat(k[1]),
-    high: parseFloat(k[2]),
-    low: parseFloat(k[3]),
-    close: parseFloat(k[4]),
-    volume: parseFloat(k[5])
-  }));
-}
+    let klineData = [];
+    let priceChartInitialized = false;
+    let wsInstance = null;
+    let pingTimer = null;
 
-// ---- Индикаторы ----
+    async function fetchTicker(){
+      const res = await fetch(`${REST}/tickers?category=linear&symbol=${SYMBOL}`);
+      const j = await res.json();
+      return j.result.list[0];
+    }
 
-function calcRSI(closes, period=14){
-  if (closes.length <= period) return [];
+    async function fetchKlines(interval="60", limit=200){
+      const res = await fetch(`${REST}/kline?category=linear&symbol=${SYMBOL}&interval=${interval}&limit=${limit}`);
+      const j = await res.json();
+      return j.result.list.reverse().map(k => ({
+        time: new Date(parseInt(k[0])),
+        open: parseFloat(k[1]),
+        high: parseFloat(k[2]),
+        low: parseFloat(k[3]),
+        close: parseFloat(k[4]),
+        volume: parseFloat(k[5])
+      }));
+    }
 
-  let rsis = [];
-  let gains = 0, losses = 0;
+    function calcRSI(closes, period=14){
+      if (closes.length <= period) return [];
+      let rsis = [];
+      let gains = 0, losses = 0;
 
-  for(let i=1;i<=period;i++){
-    let diff = closes[i] - closes[i-1];
-    if(diff >= 0) gains += diff;
-    else losses -= diff;
-  }
-
-  let avgGain = gains / period;
-  let avgLoss = losses / period;
-
-  rsis[period] = 100 - (100 / (1 + (avgGain / (avgLoss || 1e-9))));
-
-  for(let i = period + 1; i < closes.length; i++){
-    let diff = closes[i] - closes[i-1];
-    let gain = diff > 0 ? diff : 0;
-    let loss = diff < 0 ? -diff : 0;
-
-    avgGain = (avgGain * (period - 1) + gain) / period;
-    avgLoss = (avgLoss * (period - 1) + loss) / period;
-
-    rsis[i] = 100 - (100 / (1 + (avgGain / (avgLoss || 1e-9))));
-  }
-
-  return rsis;
-}
-
-function ema(values, period){
-  if (!values.length) return [];
-  let k = 2/(period+1);
-  let emaArr = [];
-  emaArr[0] = values[0];
-  for(let i=1;i<values.length;i++){
-    emaArr[i] = values[i]*k + emaArr[i-1]*(1-k);
-  }
-  return emaArr;
-}
-
-function calcMACD(closes){
-  const ema12 = ema(closes,12);
-  const ema26 = ema(closes,26);
-  const macd = closes.map((_,i)=> (ema12[i] ?? ema12[ema12.length-1]) - (ema26[i] ?? ema26[ema26.length-1]));
-  const signal = ema(macd,9);
-  const hist = macd.map((v,i)=> v - (signal[i] ?? signal[signal.length-1]));
-  return {macd, signal, hist};
-}
-
-function calcFibo(highs, lows){
-  if (highs.length < 60 || lows.length < 60) return {};
-  const swingHigh = Math.max(...highs.slice(-60));
-  const swingLow = Math.min(...lows.slice(-60));
-  const diff = swingHigh - swingLow;
-  const levels = {
-    "0.0 (High)": swingHigh,
-    "0.236": swingHigh - diff*0.236,
-    "0.382": swingHigh - diff*0.382,
-    "0.5": swingHigh - diff*0.5,
-    "0.618": swingHigh - diff*0.618,
-    "0.786": swingHigh - diff*0.786,
-    "1.0 (Low)": swingLow
-  };
-  return levels;
-}
-
-function renderFiboTable(levels, currentPrice){
-  const tbody = document.querySelector("#fiboTbl tbody");
-  tbody.innerHTML = "<tr><th>Уровень</th><th>Цена</th></tr>";
-  for(const [k,v] of Object.entries(levels)){
-    const near = Math.abs(v-currentPrice)/currentPrice < 0.01;
-    tbody.innerHTML += `<tr style="${near?'color:#d29922;font-weight:700':''}"><td>${k}</td><td>${v.toFixed(6)}</td></tr>`;
-  }
-}
-
-// ---- Классификация сигнала ----
-
-function classify(rsiLast, macdLast, signalLast){
-  let score = 0;
-  let reasons = [];
-
-  if(rsiLast < 30){ score++; reasons.push("RSI в зоне перепроданности (<30)"); }
-  else if(rsiLast > 70){ score--; reasons.push("RSI в зоне перекупленности (>70)"); }
-  else { reasons.push("RSI в нейтральной зоне"); }
-
-  if(macdLast > signalLast){ score++; reasons.push("MACD выше сигнальной линии (бычий импульс)"); }
-  else { score--; reasons.push("MACD ниже сигнальной линии (медвежий импульс)"); }
-
-  let label, cls;
-  if(score >= 2){ label = "LONG"; cls = "sig-long"; }
-  else if(score <= -2){ label = "SHORT"; cls = "sig-short"; }
-  else { label = "НЕЙТРАЛЬНО / ОЖИДАНИЕ"; cls = "sig-neutral"; }
-
-  return {label, cls, reasons};
-}
-
-// ---- Графики ----
-
-function renderPriceChart(kl){
-  const x = kl.map(k=>k.time);
-  Plotly.newPlot("priceChart", [{
-    x,
-    open: kl.map(k=>k.open),
-    high: kl.map(k=>k.high),
-    low: kl.map(k=>k.low),
-    close: kl.map(k=>k.close),
-    type: "candlestick",
-    increasing: {line:{color:"#3fb950"}},
-    decreasing: {line:{color:"#f85149"}}
-  }], {
-    paper_bgcolor:"#161b22", plot_bgcolor:"#161b22",
-    font:{color:"#e6e6e6", size:10},
-    margin:{t:20,l:40,r:10,b:30},
-    xaxis:{rangeslider:{visible:false}, gridcolor:"#262d38"},
-    yaxis:{gridcolor:"#262d38}
-  }, {responsive:true, displayModeBar:false});
-
-  priceChartInitialized = true;
-}
-
-function updateLastCandleOnChart(last){
-  if(!priceChartInitialized) return;
-
-  Plotly.restyle("priceChart", {
-    open: [[...klineData.map(k=>k.open)]],
-    high: [[...klineData.map(k=>k.high)]],
-    low:  [[...klineData.map(k=>k.low)]],
-    close:[[...klineData.map(k=>k.close)]],
-    x:    [[...klineData.map(k=>k.time)]]
-  }, [0]); // обновляем первый trace[web:3][web:13]
-}
-
-function renderRSIChart(kl, rsis){
-  const x = kl.map(k => k.time);
-  const rsiVals = rsis;
-
-  Plotly.newPlot("rsiChart", [{
-    x,
-    y: rsiVals,
-    type: "scatter",
-    mode: "lines",
-    line: {color: "#58a6ff", width: 1}
-  }, {
-    x,
-    y: Array(rsiVals.length).fill(70),
-    type: "scatter",
-    mode: "lines",
-    line: {color: "#f85149", width: 1, dash: "dot"},
-    showlegend: false
-  }, {
-    x,
-    y: Array(rsiVals.length).fill(30),
-    type: "scatter",
-    mode: "lines",
-    line: {color: "#3fb950", width: 1, dash: "dot"},
-    showlegend: false
-  }], {
-    paper_bgcolor:"#161b22", plot_bgcolor:"#161b22",
-    font:{color:"#e6e6e6", size:10},
-    margin:{t:20,l:40,r:10,b:30},
-    xaxis:{gridcolor:"#262d38"},
-    yaxis:{gridcolor:"#262d38, range:[0,100]}
-  }, {responsive:true, displayModeBar:false});
-}
-
-function renderMACDChart(kl, macdObj){
-  const x = kl.map(k => k.time);
-  Plotly.newPlot("macdChart", [{
-    x,
-    y: macdObj.macd,
-    type: "scatter",
-    mode: "lines",
-    name: "MACD",
-    line: {color:"#58a6ff", width:1}
-  }, {
-    x,
-    y: macdObj.signal,
-    type: "scatter",
-    mode: "lines",
-    name: "Signal",
-    line: {color:"#d29922", width:1}
-  }, {
-    x,
-    y: macdObj.hist,
-    type: "bar",
-    name: "Hist",
-    marker:{color:"#3fb950"}
-  }], {
-    paper_bgcolor:"#161b22", plot_bgcolor:"#161b22",
-    font:{color:"#e6e6e6", size:10},
-    margin:{t:20,l:40,r:10,b:30},
-    xaxis:{gridcolor:"#262d38"},
-    yaxis:{gridcolor:"#262d38}
-  }, {responsive:true, displayModeBar:false});
-}
-
-// ---- REST обновление дашборда ----
-
-async function updateDashboardREST(){
-  try{
-    document.getElementById("status").textContent = "Загрузка данных Bybit (REST)...";
-
-    const [ticker, kl] = await Promise.all([
-      fetchTicker(),
-      fetchKlines("60", 200)
-    ]);
-
-    klineData = kl;
-    const closes = kl.map(k=>k.close);
-    const highs = kl.map(k=>k.high);
-    const lows  = kl.map(k=>k.low);
-
-    const lastPrice = parseFloat(ticker.lastPrice);
-    const chg24 = parseFloat(ticker.price24hPcnt);
-    const funding = parseFloat(ticker.fundingRate);
-    const oi = parseFloat(ticker.openInterest);
-
-    document.getElementById("price").textContent   = lastPrice.toFixed(6);
-    document.getElementById("chg24").textContent   = (chg24*100).toFixed(2) + "%";
-    document.getElementById("funding").textContent = (funding*100).toFixed(4) + "%";
-    document.getElementById("oi").textContent      = oi.toFixed(0);
-
-    const rsis = calcRSI(closes, 14);
-    const macdObj = calcMACD(closes);
-    const fiboLevels = calcFibo(highs, lows);
-
-    const rsiLast = rsis[rsis.length-1];
-    const macdLast = macdObj.macd[macdObj.macd.length-1];
-    const signalLast = macdObj.signal[macdObj.signal.length-1];
-
-    const sig = classify(rsiLast, macdLast, signalLast);
-    const box = document.getElementById("signalBox");
-    box.textContent = `Сигнал: ${sig.label}`;
-    box.className = "signal-box " + sig.cls;
-
-    document.getElementById("techText").textContent =
-      `RSI: ${rsiLast.toFixed(2)}; MACD: ${macdLast.toFixed(6)}, Signal: ${signalLast.toFixed(6)}. ` +
-      `Причины: ${sig.reasons.join("; ")}.`;
-
-    renderFiboTable(fiboLevels, lastPrice);
-    renderPriceChart(kl);
-    renderRSIChart(kl, rsis);
-    renderMACDChart(kl, macdObj);
-
-    document.getElementById("status").textContent = "Обновлено (REST): " + new Date().toLocaleString();
-  } catch(e){
-    console.error(e);
-    document.getElementById("status").textContent = "Ошибка REST: " + e.message;
-  }
-}
-
-// ---- WebSocket: лайв тикер + kline ----
-
-function initWebSocket(){
-  try{
-    const ws = new WebSocket(WS_PUBLIC_LINEAR); // wss://stream.bybit.com/v5/public/linear[web:27]
-
-    ws.onopen = () => {
-      console.log("WS connected");
-
-      // подписка на тикер
-      const subTicker = {
-        op: "subscribe",
-        args: [`tickers.${SYMBOL}`] // тикер для linear[web:21]
-      };
-
-      // подписка на kline H1
-      const subKline = {
-        op: "subscribe",
-        args: [`kline.60.${SYMBOL}`] // интервал 60 минут[web:8]
-      };
-
-      ws.send(JSON.stringify(subTicker));
-      ws.send(JSON.stringify(subKline));
-
-      document.getElementById("status").textContent =
-        "WebSocket подключён, идёт стрим тикера и kline...";
-    };
-
-    ws.onmessage = (ev) => {
-      try{
-        const data = JSON.parse(ev.data);
-
-        // тикер обновление
-        if (data.topic && data.topic.startsWith("tickers.")) {
-          const t = data.data[0] || data.data; // структура зависит от snapshot/delta[web:21]
-          const lastPrice = parseFloat(t.lastPrice);
-          const chg24 = parseFloat(t.price24hPcnt);
-          const funding = parseFloat(t.fundingRate);
-          const oi = parseFloat(t.openInterest);
-
-          document.getElementById("price").textContent   = lastPrice.toFixed(6);
-          document.getElementById("chg24").textContent   = (chg24*100).toFixed(2) + "%";
-          document.getElementById("funding").textContent = (funding*100).toFixed(4) + "%";
-          document.getElementById("oi").textContent      = oi.toFixed(0);
-        }
-
-        // kline обновление
-        if (data.topic && data.topic.startsWith("kline.")) {
-          const k = data.data[0]; // один объект kline[web:8]
-          const candle = {
-            time: new Date(parseInt(k.startTime)),
-            open: parseFloat(k.open),
-            high: parseFloat(k.high),
-            low: parseFloat(k.low),
-            close: parseFloat(k.close),
-            volume: parseFloat(k.volume)
-          };
-
-          // если confirm = true — закрытая свеча, добавляем
-          if (k.confirm) {
-            klineData.push(candle);
-            if (klineData.length > 200) klineData.shift();
-          } else {
-            // обновление текущей последней свечи
-            klineData[klineData.length-1] = candle;
-          }
-
-          updateLastCandleOnChart(candle);
-        }
-      } catch(e){
-        console.error("WS message error", e);
+      for(let i=1;i<=period;i++){
+        const diff = closes[i] - closes[i-1];
+        if(diff >= 0) gains += diff;
+        else losses -= diff;
       }
-    };
 
-    ws.onerror = (err) => {
-      console.error("WS error", err);
-      document.getElementById("status").textContent = "Ошибка WebSocket, см. консоль.";
-    };
+      let avgGain = gains / period;
+      let avgLoss = losses / period;
+      rsis[period] = 100 - (100 / (1 + (avgGain / (avgLoss || 1e-9))));
 
-    ws.onclose = () => {
-      console.log("WS closed, trying to reconnect in 10s...");
-      document.getElementById("status").textContent = "WebSocket отключён, реконнект через 10 секунд.";
-      setTimeout(initWebSocket, 10000);
-    };
-  } catch(e){
-    console.error("WS init error", e);
-  }
-}
+      for(let i = period + 1; i < closes.length; i++){
+        const diff = closes[i] - closes[i-1];
+        const gain = diff > 0 ? diff : 0;
+        const loss = diff < 0 ? -diff : 0;
+        avgGain = (avgGain * (period - 1) + gain) / period;
+        avgLoss = (avgLoss * (period - 1) + loss) / period;
+        rsis[i] = 100 - (100 / (1 + (avgGain / (avgLoss || 1e-9))));
+      }
+      return rsis;
+    }
 
-// ---- Старт ----
+    function ema(values, period){
+      if (!values.length) return [];
+      const k = 2 / (period + 1);
+      const emaArr = [];
+      emaArr[0] = values[0];
+      for(let i=1;i<values.length;i++){
+        emaArr[i] = values[i] * k + emaArr[i-1] * (1-k);
+      }
+      return emaArr;
+    }
 
-updateDashboardREST();
-setInterval(updateDashboardREST, 300_000); // REST раз в 5 минут для синхронизации[web:4][web:18]
-initWebSocket();
-</script>
+    function calcMACD(closes){
+      const ema12 = ema(closes, 12);
+      const ema26 = ema(closes, 26);
+      const macd = closes.map((_, i) => (ema12[i] ?? ema12[ema12.length-1]) - (ema26[i] ?? ema26[ema26.length-1]));
+      const signal = ema(macd, 9);
+      const hist = macd.map((v, i) => v - (signal[i] ?? signal[signal.length-1]));
+      return { macd, signal, hist };
+    }
 
+    function calcFibo(highs, lows){
+      if (highs.length < 60 || lows.length < 60) return {};
+      const swingHigh = Math.max(...highs.slice(-60));
+      const swingLow = Math.min(...lows.slice(-60));
+      const diff = swingHigh - swingLow;
+
+      return {
+        "0.0 (High)": swingHigh,
+        "0.236": swingHigh - diff * 0.236,
+        "0.382": swingHigh - diff * 0.382,
+        "0.5": swingHigh - diff * 0.5,
+        "0.618": swingHigh - diff * 0.618,
+        "0.786": swingHigh - diff * 0.786,
+        "1.0 (Low)": swingLow
+      };
+    }
+
+    function renderFiboTable(levels, currentPrice){
+      const tbody = document.querySelector("#fiboTbl tbody");
+      tbody.innerHTML = "<tr><th>Уровень</th><th>Цена</th></tr>";
+      for(const [k,v] of Object.entries(levels)){
+        const near = Math.abs(v-currentPrice)/currentPrice < 0.01;
+        tbody.innerHTML += `<tr style="${near ? 'color:#d29922;font-weight:700' : ''}"><td>${k}</td><td>${v.toFixed(6)}</td></tr>`;
+      }
+    }
+
+    function classify(rsiLast, macdLast, signalLast){
+      let score = 0;
+      let reasons = [];
+
+      if(rsiLast < 30){ score++; reasons.push("RSI в зоне перепроданности (<30)"); }
+      else if(rsiLast > 70){ score--; reasons.push("RSI в зоне перекупленности (>70)"); }
+      else { reasons.push("RSI в нейтральной зоне"); }
+
+      if(macdLast > signalLast){ score++; reasons.push("MACD выше сигнальной линии (бычий импульс)"); }
+      else { score--; reasons.push("MACD ниже сигнальной линии (медвежий импульс)"); }
+
+      let label, cls;
+      if(score >= 2){ label = "LONG"; cls = "sig-long"; }
+      else if(score <= -2){ label = "SHORT"; cls = "sig-short"; }
+      else { label = "НЕЙТРАЛЬНО / ОЖИДАНИЕ"; cls = "sig-neutral"; }
+
+      return { label, cls, reasons };
+    }
+
+    function renderPriceChart(kl){
+      const x = kl.map(k => k.time);
+      Plotly.newPlot("priceChart", [{
+        x,
+        open: kl.map(k => k.open),
+        high: kl.map(k => k.high),
+        low: kl.map(k => k.low),
+        close: kl.map(k => k.close),
+        type: "candlestick",
+        increasing: { line: { color: "#3fb950" } },
+        decreasing: { line: { color: "#f85149" } }
+      }], {
+        paper_bgcolor: "#161b22",
+        plot_bgcolor: "#161b22",
+        font: { color: "#e6e6e6", size: 10 },
+        margin: { t: 20, l: 40, r: 10, b: 30 },
+        xaxis: { rangeslider: { visible: false }, gridcolor: "#262d38" },
+        yaxis: { gridcolor: "#262d38" }
+      }, { responsive: true, displayModeBar: false });
+
+      priceChartInitialized = true;
+    }
+
+    function updateLastCandleOnChart(){
+      if(!priceChartInitialized) return;
+
+      Plotly.restyle("priceChart", {
+        open: [[...klineData.map(k => k.open)]],
+        high: [[...klineData.map(k => k.high)]],
+        low: [[...klineData.map(k => k.low)]],
+        close: [[...klineData.map(k => k.close)]],
+        x: [[...klineData.map(k => k.time)]]
+      }, [0]);
+    }
+
+    function renderRSIChart(kl, rsis){
+      const x = kl.map(k => k.time);
+      Plotly.newPlot("rsiChart", [{
+        x,
+        y: rsis,
+        type: "scatter",
+        mode: "lines",
+        line: { color: "#58a6ff", width: 1 }
+      }, {
+        x,
+        y: Array(rsis.length).fill(70),
+        type: "scatter",
+        mode: "lines",
+        line: { color: "#f85149", width: 1, dash: "dot" },
+        showlegend: false
+      }, {
+        x,
+        y: Array(rsis.length).fill(30),
+        type: "scatter",
+        mode: "lines",
+        line: { color: "#3fb950", width: 1, dash: "dot" },
+        showlegend: false
+      }], {
+        paper_bgcolor: "#161b22",
+        plot_bgcolor: "#161b22",
+        font: { color: "#e6e6e6", size: 10 },
+        margin: { t: 20, l: 40, r: 10, b: 30 },
+        xaxis: { gridcolor: "#262d38" },
+        yaxis: { gridcolor: "#262d38", range: [0, 100] }
+      }, { responsive: true, displayModeBar: false });
+    }
+
+    function renderMACDChart(kl, macdObj){
+      const x = kl.map(k => k.time);
+      Plotly.newPlot("macdChart", [{
+        x,
+        y: macdObj.macd,
+        type: "scatter",
+        mode: "lines",
+        name: "MACD",
+        line: { color:"#58a6ff", width:1 }
+      }, {
+        x,
+        y: macdObj.signal,
+        type: "scatter",
+        mode: "lines",
+        name: "Signal",
+        line: { color:"#d29922", width:1 }
+      }, {
+        x,
+        y: macdObj.hist,
+        type: "bar",
+        name: "Hist",
+        marker:{ color:"#3fb950" }
+      }], {
+        paper_bgcolor:"#161b22",
+        plot_bgcolor:"#161b22",
+        font:{ color:"#e6e6e6", size:10 },
+        margin:{ t:20,l:40,r:10,b:30 },
+        xaxis:{ gridcolor:"#262d38" },
+        yaxis:{ gridcolor:"#262d38" }
+      }, { responsive:true, displayModeBar:false });
+    }
+
+    function recalcAndRenderFromKlines(lastPriceOverride = null){
+      if (!klineData.length) return;
+
+      const closes = klineData.map(k => k.close);
+      const highs = klineData.map(k => k.high);
+      const lows = klineData.map(k => k.low);
+
+      const rsis = calcRSI(closes, 14);
+      const macdObj = calcMACD(closes);
+      const fiboLevels = calcFibo(highs, lows);
+
+      const rsiLast = rsis[rsis.length - 1];
+      const macdLast = macdObj.macd[macdObj.macd.length - 1];
+      const signalLast = macdObj.signal[macdObj.signal.length - 1];
+      const lastPrice = lastPriceOverride ?? closes[closes.length - 1];
+
+      const sig = classify(rsiLast, macdLast, signalLast);
+      const box = document.getElementById("signalBox");
+      box.textContent = `Сигнал: ${sig.label}`;
+      box.className = "signal-box " + sig.cls;
+
+      document.getElementById("techText").textContent =
+        `RSI: ${rsiLast.toFixed(2)}; MACD: ${macdLast.toFixed(6)}, Signal: ${signalLast.toFixed(6)}. Причины: ${sig.reasons.join("; ")}.`;
+
+      renderFiboTable(fiboLevels, lastPrice);
+
+      if (!priceChartInitialized) {
+        renderPriceChart(klineData);
+      } else {
+        updateLastCandleOnChart();
+      }
+
+      renderRSIChart(klineData, rsis);
+      renderMACDChart(klineData, macdObj);
+    }
+
+    async function updateDashboardREST(){
+      try{
+        document.getElementById("status").textContent = "Загрузка данных Bybit (REST)...";
+
+        const [ticker, kl] = await Promise.all([
+          fetchTicker(),
+          fetchKlines("60", 200)
+        ]);
+
+        klineData = kl;
+
+        const lastPrice = parseFloat(ticker.lastPrice);
+        const chg24 = parseFloat(ticker.price24hPcnt);
+        const funding = parseFloat(ticker.fundingRate);
+        const oi = parseFloat(ticker.openInterest);
+
+        document.getElementById("price").textContent = Number.isFinite(lastPrice) ? lastPrice.toFixed(6) : "-";
+        document.getElementById("chg24").textContent = Number.isFinite(chg24) ? (chg24 * 100).toFixed(2) + "%" : "-";
+        document.getElementById("funding").textContent = Number.isFinite(funding) ? (funding * 100).toFixed(4) + "%" : "-";
+        document.getElementById("oi").textContent = Number.isFinite(oi) ? oi.toFixed(0) : "-";
+
+        recalcAndRenderFromKlines(lastPrice);
+        document.getElementById("status").textContent = "Обновлено (REST): " + new Date().toLocaleString();
+      } catch(e){
+        console.error(e);
+        document.getElementById("status").textContent = "Ошибка REST: " + e.message;
+      }
+    }
+
+    function applyTickerUpdate(t){
+      if (!t) return;
+
+      if (t.lastPrice != null) {
+        const lastPrice = parseFloat(t.lastPrice);
+        if (Number.isFinite(lastPrice)) {
+          document.getElementById("price").textContent = lastPrice.toFixed(6);
+        }
+      }
+
+      if (t.price24hPcnt != null) {
+        const chg24 = parseFloat(t.price24hPcnt);
+        if (Number.isFinite(chg24)) {
+          document.getElementById("chg24").textContent = (chg24 * 100).toFixed(2) + "%";
+        }
+      }
+
+      if (t.fundingRate != null) {
+        const funding = parseFloat(t.fundingRate);
+        if (Number.isFinite(funding)) {
+          document.getElementById("funding").textContent = (funding * 100).toFixed(4) + "%";
+        }
+      }
+
+      if (t.openInterest != null) {
+        const oi = parseFloat(t.openInterest);
+        if (Number.isFinite(oi)) {
+          document.getElementById("oi").textContent = oi.toFixed(0);
+        }
+      }
+    }
+
+    function applyKlineUpdate(k){
+      if (!k) return;
+
+      const startRaw = k.start ?? k.startTime;
+      if (startRaw == null) return;
+
+      const candle = {
+        time: new Date(parseInt(startRaw)),
+        open: parseFloat(k.open),
+        high: parseFloat(k.high),
+        low: parseFloat(k.low),
+        close: parseFloat(k.close),
+        volume: parseFloat(k.volume)
+      };
+
+      if (!klineData.length) {
+        klineData.push(candle);
+        return;
+      }
+
+      const incomingTime = +candle.time;
+      const lastExistingTime = +klineData[klineData.length - 1].time;
+
+      if (k.confirm === true) {
+        if (incomingTime > lastExistingTime) {
+          klineData.push(candle);
+          if (klineData.length > 200) klineData.shift();
+        } else {
+          klineData[klineData.length - 1] = candle;
+        }
+      } else {
+        if (incomingTime >= lastExistingTime) {
+          klineData[klineData.length - 1] = candle;
+        }
+      }
+
+      recalcAndRenderFromKlines(candle.close);
+    }
+
+    function clearWsTimers(){
+      if (pingTimer) {
+        clearInterval(pingTimer);
+        pingTimer = null;
+      }
+    }
+
+    function initWebSocket(){
+      try{
+        if (wsInstance && wsInstance.readyState === WebSocket.OPEN) {
+          return;
+        }
+
+        const ws = new WebSocket(WS_PUBLIC_LINEAR);
+        wsInstance = ws;
+
+        ws.onopen = () => {
+          const subTicker = { op: "subscribe", args: [`tickers.${SYMBOL}`] };
+          const subKline = { op: "subscribe", args: [`kline.60.${SYMBOL}`] };
+
+          ws.send(JSON.stringify(subTicker));
+          ws.send(JSON.stringify(subKline));
+
+          clearWsTimers();
+          pingTimer = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ op: "ping" }));
+            }
+          }, 20000);
+
+          document.getElementById("status").textContent =
+            "WebSocket подключён, идёт стрим тикера и kline...";
+        };
+
+        ws.onmessage = (ev) => {
+          try{
+            const data = JSON.parse(ev.data);
+
+            if (data.topic && data.topic.startsWith("tickers.")) {
+              const t = Array.isArray(data.data) ? data.data[0] : data.data;
+              applyTickerUpdate(t);
+            }
+
+            if (data.topic && data.topic.startsWith("kline.")) {
+              const k = Array.isArray(data.data) ? data.data[0] : data.data;
+              applyKlineUpdate(k);
+            }
+          } catch(e){
+            console.error("WS message error", e);
+          }
+        };
+
+        ws.onerror = (err) => {
+          console.error("WS error", err);
+          document.getElementById("status").textContent = "Ошибка WebSocket, см. консоль.";
+        };
+
+        ws.onclose = () => {
+          clearWsTimers();
+          document.getElementById("status").textContent =
+            "WebSocket отключён, реконнект через 10 секунд.";
+          setTimeout(initWebSocket, 10000);
+        };
+      } catch(e){
+        console.error("WS init error", e);
+      }
+    }
+
+    updateDashboardREST();
+    setInterval(updateDashboardREST, 300000);
+    initWebSocket();
+  </script>
 </body>
 </html>
